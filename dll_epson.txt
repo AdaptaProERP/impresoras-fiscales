@@ -1,10 +1,11 @@
 // Programa   : DLL_EPSON
 // Fecha/Hora : 26/04/2022 14:46:55
-// PropÃ³sito  : LLamadas Epson DLL
+// Propósito  : LLamadas Epson DLL
 // Creado Por : Kelvis Escalante, Juan Navas
 // Requiere   : Implementar Driver photon, puede descargarlo desde https://mega.nz/folder/tckzSCbB#ROs1j2cWRcicFoVmnj75OQ
+//              Archivo pnpdll.dll desde https://desarrollospnp.com/archivos/pnpdll2022.zip  
 // Llamado por:
-// AplicaciÃ³n :
+// Aplicación :
 // Tabla      :
 #INCLUDE "DPXBASE.CH"
 
@@ -12,10 +13,10 @@ PROCE MAIN(cTipDoc,cNumero)
   LOCAL cFileLog:="",cSql,cWhere,cEstatus
   LOCAL cMaqui,cNombre,cRif   ,cDir1   ,cTel1,cNumFav
   LOCAL cCant ,cPrecio,cDescri,cAlicuota
-  LOCAL cPuerto :=RIGHT(oDp:cImpFisCom,1) // si es COM9, serÃ¡ 9
+  LOCAL cPuerto :=RIGHT(oDp:cImpFisCom,1) // si es COM9, será 9
   LOCAL nDivisa :=0,nIva
   LOCAL oEpson,oTable,cPicture:="999999999.99"
-  LOCAL lSave:=.F.,cTipo,nNumero,cMemo
+  LOCAL lSave:=.F.,cTipo,nNumero,cMemo,cNumFis:=""
 
   DEFAULT cTipDoc:="TIK",;
           cNumero:=SQLGETMAX("DPDOCCLI","DOC_NUMERO","DOC_TIPDOC"+GetWhere("=",cTipDoc))
@@ -25,7 +26,7 @@ PROCE MAIN(cTipDoc,cNumero)
           "DOC_NUMERO"+GetWhere("=",cNumero      )+" AND "+;
           "DOC_TIPTRA"+GetWhere("=","D"          )
 
-  // Obtiene el Monto en Bs para que la impresora fiscal realice el CÃ¡lculo del IGTF.
+  // Obtiene el Monto en Bs para que la impresora fiscal realice el Cálculo del IGTF.
   nDivisa  :=EJECUTAR("DPDOCCLIPAGDIV",oDp:cSucursal,cTipDoc,cNumero)
 
   IF oDp:nImpFisLen>0
@@ -85,8 +86,14 @@ PROCE MAIN(cTipDoc,cNumero)
      RETURN .F.
   ENDIF
 
-  cSql:=" SELECT MOV_ASOTIP,MOV_ASODOC,MOV_FCHVEN,MOV_DOCUME,MOV_CODIGO,INV_DESCRI,MOV_TOTAL,DOC_OTROS,DOC_DCTO,MOV_PRECIO,MOV_DESCUE,MOV_CANTID,MOV_IVA,CCG_NOMBRE,CCG_RIF,CCG_DIR1,CCG_TEL1,"+;
-        " DOC_IMPRES,SFI_SERIMP,MOV_LISTA,TPP_INCIVA "+;
+  // ,CCG_NOMBRE,CCG_RIF,CCG_DIR1,CCG_TEL1,"+;
+
+  cSql:=" SELECT MOV_ASOTIP,MOV_ASODOC,MOV_FCHVEN,MOV_DOCUME,MOV_CODIGO,INV_DESCRI,MOV_TOTAL,DOC_OTROS,DOC_DCTO,MOV_PRECIO,MOV_DESCUE,MOV_CANTID,MOV_IVA,"+;
+        " DOC_IMPRES,SFI_SERIMP,MOV_LISTA,TPP_INCIVA,"+;
+        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_RIF   ,DPCLIENTES.CLI_RIF   ) AS  CCG_RIF    ,"+;
+        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_NOMBRE,DPCLIENTES.CLI_NOMBRE) AS  CCG_NOMBRE ,"+;
+        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_DIR1  ,DPCLIENTES.CLI_DIR1  ) AS  CCG_DIR1   ,"+;
+        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_TEL1  ,DPCLIENTES.CLI_TEL1  ) AS  CCG_TEL1    "+;
         " FROM DPMOVINV "+;
         " INNER JOIN DPINV ON MOV_CODIGO=INV_CODIGO "+;
         " INNER JOIN DPDOCCLI       ON MOV_CODSUC=DOC_CODSUC AND MOV_TIPDOC=DOC_TIPDOC AND DOC_NUMERO=MOV_DOCUME AND DOC_TIPTRA='D'"+;
@@ -114,8 +121,8 @@ PROCE MAIN(cTipDoc,cNumero)
       RETURN .F.
    ENDIF
 
-   IF oTable:DOC_IMPRES
-      MsgMemo("NÃºmero Fiscal "+cNumero+" ya fuÃ© impreso")
+   IF ValType(oTable:DOC_IMPRES)="L" .AND. oTable:DOC_IMPRES
+      MsgMemo("Número Fiscal "+cNumero+" ya fué impreso")
       oTable:End()
       RETURN .F.
    ENDIF
@@ -140,7 +147,7 @@ PROCE MAIN(cTipDoc,cNumero)
      cCant     :=ALLTRIM(TRANSFORM(oTable:MOV_CANTID,"999999.999"))
      cPrecio   :=ALLTRIM(TRANSFORM(oTable:MOV_PRECIO,cPicture))
 
-     // Si el precio tiene IVA incluido, el precio serÃ¡ la Base Imponible JN 23/11/2022 
+     // Si el precio tiene IVA incluido, el precio será la Base Imponible JN 23/11/2022 
      IF oTable:TPP_INCIVA
        nIva   :=1+(oTable:MOV_IVA/100)
        cPrecio:=ALLTRIM(TRANSFORM((oTable:MOV_TOTAL/oTable:MOV_CANTID)/nIva,cPicture))
@@ -148,7 +155,7 @@ PROCE MAIN(cTipDoc,cNumero)
 
      cDescri   :=ALLTRIM(PADR(oTable:INV_DESCRI,20))
 
-     // Origen de Cuotas (Club,Colegios,Agremiados), la descripciÃ³n incluye la fecha del Servicio
+     // Origen de Cuotas (Club,Colegios,Agremiados), la descripción incluye la fecha del Servicio
      IF oTable:MOV_ASOTIP="CUO" .AND. !Empty(oTable:MOV_FCHVEN)
         cDescri:=PADR(oTable:INV_DESCRI,20-6)+"-"+UPPER(LEFT(CMES(oTable:MOV_FCHVEN),3))+RIGHT(LSTR(YEAR(oTable:MOV_FCHVEN),4),2)
      ENDIF
@@ -166,6 +173,10 @@ PROCE MAIN(cTipDoc,cNumero)
   oTable:End()
 
   oEpson:IFPRINT()
+
+  // Luego de Imprimir Obtenemos el número para Almacenarlo en campo DOC_NUMFIS
+  // JN 05/02/2023, Validar con impresora física para dejarlo en producción   
+  cNumFis:=oEpson:IFPFULTIMO("10") 
   oEpson:IFCLOSE()
 
 //  IF oEpson:lError
@@ -207,7 +218,7 @@ PROCE MAIN(cTipDoc,cNumero)
   IF oDp:lImpFisModVal .OR. oEpson:lError
     VIEWRTF(cFileLog,"Documento "+cTipDoc+cNumero)
   ELSE
-    SQLUPDATE("DPDOCCLI",{"DOC_NUMPER","DOC_IMPRES"},{oEpson:IFESTATUS(),.T.},cWhere) // Estatus Impresora
+    SQLUPDATE("DPDOCCLI",{"DOC_NUMPER","DOC_IMPRES","DOC_NUMFIS"},{oEpson:IFESTATUS(),.T.,cNumFis},cWhere) // Estatus Impresora
   ENDIF
 
   SysRefresh(.T.)
@@ -295,7 +306,7 @@ FUNCTION IFESTATUS()
   oEpson:cEstatus:=""
 
   IF cResp = "TO"
-     oEpson:cEstatus:="Se excediÃ³ el tiempo de espera,"
+     oEpson:cEstatus:="Se excedió el tiempo de espera,"
      oEpson:lError:=.T.
   ENDIF
 
@@ -361,7 +372,7 @@ FUNCTION PFRUNCMD(cFunc,cPar1,cPar2,cPar3,cPar4,cPar5,cPar6,cPar7,cPar8,cPar9)
 RETURN uResult
 
 /*
-// Cierra la ConexiÃ³n con la Impresora
+// Cierra la Conexión con la Impresora
 */
 FUNCTION IFCLOSE()
 
@@ -373,6 +384,30 @@ FUNCTION IFCLOSE()
    ENDIF
 
 RETURN 
+
+/*
+// Obtiene ultimos Valores de la Impresora
+PFultimo: 0000,0000,44,00,45,200312,143427,0035,0000,00053574,00000662,0815
+Campo 1 Estado Impresora <0000>
+Campo 2 Estado Fiscal <0000>
+Campo 3 Ultimo valor de Secuencia
+Campo 4 Código del Estado actual de la impresora
+Campo 5 Código último comando ejecutado
+Campo 6 Fecha en la Impresora Fiscal “AAMMDD”
+Campo 7 Hora en la Impresora Fiscal “HHMMSS”
+Campo 8 Número Factura fiscal del periodo fiscal
+Campo 9 Número Documento no Fiscal del periodo fiscal
+Campo 10 Número Factura fiscal acumulado
+Campo 11 Número Documento no Fiscal acumulado
+Campo 12 Número último reporte Z
+*/
+FUNCTION IFPFULTIMO(cPar1)
+  LOCAL cResp
+
+  cResp:=oEpson:PFRUNCMD("PFultimo",cPar1)
+
+RETURN cResp
+
 
 /*
 // Cerrar el Archivo pnpdll.dll
