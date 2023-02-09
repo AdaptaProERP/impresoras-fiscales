@@ -1,0 +1,178 @@
+// Programa   : DPSERIEFISCALMNU
+// Fecha/Hora : 24/09/2014 02:02:44
+// Propósito  : Menú DPBANCOS
+// Creado Por : DpXbase
+// Llamado por: DPBAMCOS.LBX
+// Aplicación : Cuentas Bancarias
+// Tabla      : DPDPBANCOS
+
+
+#INCLUDE "DPXBASE.CH"
+#INCLUDE "TSBUTTON.CH"
+
+FUNCTION MAIN(cModelo)
+  LOCAL cLetra,aBtn:={},I
+  LOCAL oFont,oFontB,oBtn
+  LOCAL cWhere,bAction,nGroup,cImpFis
+
+  DEFAULT cModelo:=SQLGET("DPSERIEFISCAL","SFI_MODELO")
+
+  cLetra :=SQLGET("DPSERIEFISCAL","SFI_LETRA,SFI_IMPFIS,SFI_MODVAL","SFI_MODELO"+GetWhere("=",cModelo))
+  cImpFis:=DPSQLROW(2,"Ninguna")
+
+  oDp:lImpFisModVal:=DPSQLROW(3,.T.)
+
+
+  DEFINE FONT oFont    NAME "Tahoma" SIZE 0,-14
+  DEFINE FONT oFontB   NAME "Tahoma" SIZE 0,-14 BOLD
+
+  DpMdi(GetFromVar("{oDp:DPSERIEFISCAL}"),"oSerieMnu","TEST.EDT")
+
+  oSerieMnu:cModelo :=cModelo
+  oSerieMnu:cLetra  :=cLetra
+  oSerieMnu:lSalir  :=.F.
+  oSerieMnu:nHeightD:=45
+  oSerieMnu:lMsgBar :=.F.
+  oSerieMnu:oGrp    :=NIL
+  oSerieMnu:cImpFis :=cImpFis
+
+  SetScript("DPSERIEFISCALMNU")
+
+  AADD(aBtn,{"Consultar"    ,"VIEW.BMP"      ,"CONSULTAR" })
+
+  IF ISRELEASE("17.01")
+    AADD(aBtn,{"Documentos"   ,"XBROWSE.BMP"   ,"DOCUMENTOS"})
+  ENDIF
+
+  AADD(aBtn,{"Exportar hacia Facturas de Contingencia"   ,"EXPORTS.BMP"   ,"FAVTOFAM"})
+
+  AADD(aBtn,{"Permisos"     ,"xunlock.BMP"   ,"PERMISOS"})
+
+  IF !Empty(oSerieMnu:cImpFis) .AND. !"NING"$UPPER(oSerieMnu:cImpFis)
+     AADD(aBtn,{"Reporte X"         ,"RUN2.BMP"   ,"REPORTEX"})
+     AADD(aBtn,{"Reporte Z"         ,"RUN3.BMP"   ,"REPORTEZ"})
+     AADD(aBtn,{"Cancelar Impresión","CANCEL2.BMP" ,"REPCANCEL"})
+  ENDIF
+
+  AADD(aBtn,{"Salir"        ,"XSALIR.BMP"    ,"EXIT"      })
+
+  oSerieMnu:Windows(0,0,530+50,415)
+
+  @ 48, -1 OUTLOOK oSerieMnu:oOut ;
+     SIZE 150+250, oSerieMnu:oWnd:nHeight()-90;
+     PIXEL ;
+     FONT oFont ;
+     OF oSerieMnu:oWnd;
+     COLOR CLR_BLACK,oDp:nGris2
+
+   DEFINE GROUP OF OUTLOOK oSerieMnu:oOut PROMPT "&Opciones "
+
+   FOR I=1 TO LEN(aBtn)
+
+      DEFINE BITMAP OF OUTLOOK oSerieMnu:oOut ;
+             BITMAP "BITMAPS\"+aBtn[I,2];
+             PROMPT aBtn[I,1];
+             ACTION 1=1
+
+      nGroup:=LEN(oSerieMnu:oOut:aGroup)
+      oBtn:=ATAIL(oSerieMnu:oOut:aGroup[ nGroup, 2 ])
+
+      bAction:=BloqueCod("oSerieMnu:BTNACTION(["+aBtn[I,3]+","+aBtn[I,1]+"])")
+
+      oBtn:bAction:=bAction
+
+      oBtn:=ATAIL(oSerieMnu:oOut:aGroup[ nGroup, 3 ])
+      oBtn:bLButtonUp:=bAction
+
+
+   NEXT I
+
+   @ 0, 100 SPLITTER oSerieMnu:oSpl ;
+            VERTICAL ;
+            PREVIOUS CONTROLS oSerieMnu:oOut ;
+            LEFT MARGIN 70 ;
+            RIGHT MARGIN 200 ;
+            SIZE 40, 10  PIXEL ;
+            OF oSerieMnu:oWnd ;
+             _3DLOOK ;
+            UPDATE
+
+   DEFINE DIALOG oSerieMnu:oDlg FROM 0,oSerieMnu:oOut:nWidth() TO oSerieMnu:nHeightD,700;
+          TITLE "" STYLE WS_CHILD OF oSerieMnu:oWnd;
+          PIXEL COLOR NIL,oDp:nGris FONT oFontB
+
+   @ .1,.2 GROUP oSerieMnu:oGrp TO 10,10 PROMPT "["+oSerieMnu:cLetra+"-"+oSerieMnu:cModelo+"] "
+
+   @ .5,.5 SAY "Impresora Fiscal :"+oSerieMnu:cImpFis+"" SIZE 190,10;
+           COLOR CLR_WHITE,12615680;
+           FONT oFontB
+
+   ACTIVATE DIALOG oSerieMnu:oDlg NOWAIT VALID .F.
+
+   oSerieMnu:Activate("oSerieMnu:FRMINIT()",,"oSerieMnu:oSpl:AdjRight()")
+ 
+   EJECUTAR("DPSUBMENUCREAREG",oSerieMnu,NIL,"M","DPSERIEFICALMNU")
+
+RETURN
+
+FUNCTION FRMINIT()
+
+   oSerieMnu:oWnd:bResized:={||oSerieMnu:oDlg:Move(0,0,oSerieMnu:oWnd:nWidth(),50,.T.),;
+                             oSerieMnu:oGrp:Move(0,0,oSerieMnu:oWnd:nWidth()-15,oSerieMnu:nHeightD,.T.)}
+
+   EVal(oSerieMnu:oWnd:bResized)
+
+RETURN .T.
+
+// Ejecutar
+FUNCTION BTNACTION(cAction,cTitle)
+  LOCAL cWhere,cWeb,oCursor
+
+  IF cAction="EXIT"
+     oSerieMnu:Close()
+  ENDIF
+
+  IF cAction="CONSULTAR"
+    EJECUTAR("DPSERIEFISCAL",0,oSerieMnu:cModelo)
+    RETURN .T.
+  ENDIF
+
+  IF cAction="DOCUMENTOS"
+    cWhere:="DOC_CODSUC"+GetWhere("=",oDp:cSucursal)+" AND DOC_SERFIS"+GetWhere("=",oSerieMnu:cLetra)
+    EJECUTAR("BRSERFISCAL",cWhere)
+    RETURN .T.
+  ENDIF
+
+  IF cAction="PERMISOS"
+    oCursor:=OpenTable("SELECT * FROM DPSERIEFISCAL WHERE SFI_MODELO"+GetWhere("=",oSerieMnu:cModelo))
+    EJECUTAR("DPTABXUSU",oCursor:SFI_MODELO,oCursor:SFI_LETRA,"DPSERIEFISCAL","Usuarios por "+GetFromVar("DPSERIEFISCAL"))
+    oCursor:End()
+    RETURN .T.
+  ENDIF
+
+  IF cAction="FAVTOFAM" 
+
+     IF MsgNoYes("Desea Migrar las Facturas de Venta hacia Facturas de Contigencia","Necesario para Reiniciar la facturación desde Impresora Fiscal")
+        MsgRun("Procesando","por favor espere",{||EJECUTAR("FAVTOFAM")})
+     ENDIF
+  ENDIF
+
+
+  IF cAction="REPORTEZ" 
+     EJECUTAR("DLL_IMPFISCAL_CMD","Z",cAction,NIL,oSerieMnu:cLetra,cTitle)
+  ENDIF
+
+  IF cAction="REPORTEX" 
+     EJECUTAR("DLL_IMPFISCAL_CMD","X",cAction,NIL,oSerieMnu:cLetra,cTitle)
+  ENDIF
+
+  IF cAction="REPCANCEL" 
+     EJECUTAR("DLL_IMPFISCAL_CMD","C",cAction,NIL,oSerieMnu:cLetra,cTitle)
+  ENDIF
+
+
+RETURN .T.
+
+FUNCTION CLOSE()
+RETURN .T.
+
