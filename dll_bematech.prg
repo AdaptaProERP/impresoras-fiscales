@@ -334,7 +334,7 @@ FUNCTION BmFlagFiscal( FlagFiscal )
 
   oBema:FlagFiscal:=FlagFiscal
 
-  oBema:oFile:AppStr("BmFlagFiscal,1->"+CTOO(FlagFiscal,"C")+" "+nResult="+CTOO(uResult,"C")+CRLF)
+  oBema:oFile:AppStr("BmFlagFiscal,1->"+CTOO(FlagFiscal,"C")+" nResult="+CTOO(uResult,"C")+CRLF)
 
 RETURN uResult
 
@@ -371,7 +371,8 @@ FUNCTION BemaLeerAlicuota( cTasas )
   ENDIF
 
   oBema:cLeeTasas:=cTasas
-  oBema:oFile:AppStr("cTasas->"+CTOO(cTasas,"C")+CRLF)
+  oBema:oFile:AppStr("cTasas->"+CTOO(cTasas,"C")+CRLF+","+;
+                     "nResult="+CTOO(uResult,"C")
 
 RETURN uResult
 
@@ -385,7 +386,9 @@ FUNCTION BemaProgAlicuota( cTasas )
      uResult := FWCallDLL( cFarProc,cTasas )
   ENDIF
 
-  oBema:oFile:AppStr("cTasas->"+CTOO(cTasas,"C")+CRLF)
+  oBema:oFile:AppStr("cTasas->"+CTOO(cTasas,"C")+CRLF+","+;
+                     "nResult="+CTOO(uResult,"C")
+
 
 RETURN uResult
 
@@ -647,23 +650,64 @@ FUNCTION BmMemFiscR( In,Fi )
 RETURN uResult
 
 FUNCTION BmCpGerAbr( Texto )
-  LOCAL cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_CierraInformeGerencial" ) == .T., "BmCpGerAbr", "Bematech_FI_CierraInformeGerencial" ), .T., 7,8 )
-  LOCAL uResult := FWCallDLL( cFarProc,Texto )
+  LOCAL cFarProc := NIL
+  LOCAL uResult  := 0 // Modo Validación
+ 
+  IF !oDp:lImpFisModVal
+     cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_CierraInformeGerencial" ) == .T., "BmCpGerAbr", "Bematech_FI_CierraInformeGerencial" ), .T., 7,8 )
+     uResult := FWCallDLL( cFarProc,Texto )
+  ENDIF
+
+  oBema:oFile:AppStr("BmCpGerAbr( Texto )"+CRLF+;
+                     "Texto->"+CTOO(Texto,"C")+","+CRLF+;
+                     "nResult="+CTOO(uResult,"C")+CRLF)
+
 RETURN uResult
 
 FUNCTION BmCpGerFec( )
-  LOCAL cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_CierraInformeGerencial" ) == .T., "BmCpGerFec", "Bematech_FI_CierraInformeGerencial" ), .T., 7 )
-  LOCAL uResult := FWCallDLL( cFarProc )
+  LOCAL cFarProc := NIL
+  LOCAL uResult  := 0 // Modo Validación
+ 
+  IF !oDp:lImpFisModVal
+    cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_CierraInformeGerencial" ) == .T., "BmCpGerFec", "Bematech_FI_CierraInformeGerencial" ), .T., 7 )
+    uResult := FWCallDLL( cFarProc )
+  ENDIF
+
+  oBema:oFile:AppStr("BmCpGerFec( )"+CRLF+;
+                     "nResult="+CTOO(uResult,"C")+CRLF)
+
 RETURN uResult
 
 FUNCTION BmStGaveta( nStatus )
-  LOCAL cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_VerificaEstadoGaveta" ) == .T., "BmStGaveta", "Bematech_FI_VerificaEstadoGaveta" ), .T., 7,10 )
-  LOCAL uResult := FWCallDLL( cFarProc,@nStatus )
+  LOCAL cFarProc := NIL
+  LOCAL uResult  := 0 // Modo Validación
+ 
+  IF !oDp:lImpFisModVal
+    cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_VerificaEstadoGaveta" ) == .T., "BmStGaveta", "Bematech_FI_VerificaEstadoGaveta" ), .T., 7,10 )
+    uResult := FWCallDLL( cFarProc,@nStatus )
+  ENDIF
+
+  oBema:oFile:AppStr("BmStGaveta( nStatus )"      +CRLF+;
+                     "nStatus->"+CTOO(nStatus,"C")+","+CRLF+;
+                     "nResult=" +CTOO(uResult,"C")+CRLF)
+
 RETURN uResult
 
 FUNCTION BmCupAdAbr( FormaPgto,Valor,Cupom )
-  LOCAL cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_AbreComprobanteNoFiscalVinculado" ) == .T., "BmCupAdAbr", "Bematech_FI_AbreComprobanteNoFiscalVinculado" ), .T., 7,8,8,8 )
-  LOCAL uResult := FWCallDLL( cFarProc,FormaPgto,Valor,Cupom )
+  LOCAL cFarProc := NIL
+  LOCAL uResult  := 0 // Modo Validación
+ 
+  IF !oDp:lImpFisModVal
+     cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_AbreComprobanteNoFiscalVinculado" ) == .T., "BmCupAdAbr", "Bematech_FI_AbreComprobanteNoFiscalVinculado" ), .T., 7,8,8,8 )
+     uResult := FWCallDLL( cFarProc,FormaPgto,Valor,Cupom )
+  ENDIF
+
+  oBema:oFile:AppStr("BmCupAdAbr( FormaPgto,Valor,Cupom )"+CRLF+;
+                     "FormaPgto->"+CTOO(FormaPgto,"C")+","+CRLF+;
+                     "Valor->"    +CTOO(Valor    ,"C")+","+CRLF+;
+                     "Cupom->"    +CTOO(Cupom    ,"C")+","+CRLF+;
+                     "nResult="+CTOO(uResult,"C")+CRLF)
+
 RETURN uResult
 
 FUNCTION BmCupAdUsa( Texto )
