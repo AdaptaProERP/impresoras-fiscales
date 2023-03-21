@@ -14,7 +14,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
   LOCAL cFileLog:=""
   LOCAL oSerFis :=NIL
   LOCAL lDemo   :=(cTipDoc=NIL)
-  LOCAL uBuf,nClrText:=0
+  LOCAL uBuf,nClrText:=0,lSave:=.F.,cMemo,cTipo:="",cSql:="",nNumero,oTable
+  LOCAL cFecha,cHora,cAlicuota,aData:={}
 
   DEFAULT cCodSuc:=oDp:cSucursal,;
           cTipDoc:="FAV",;
@@ -22,8 +23,10 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
 
   DEFAULT lMsgErr:=.T.,;
           lShow  :=.T.,;
-          lBrowse:=.T. 
-
+          lBrowse:=.T.,;
+          oDp:lImpFisModVal:=.T.,;
+          oDp:lImpFisRegAud:=.T.,;
+          oDp:cImpFisCom   :="BEMATECH"
 
 // ? cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,"cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse"
 
@@ -32,20 +35,45 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
   ENDIF
 
   cTicket:=cNumero 
-  
+
+  cSql:=" SELECT MOV_ASOTIP,MOV_ASODOC,MOV_FCHVEN,MOV_DOCUME,MOV_CODIGO,INV_DESCRI,MOV_TOTAL,DOC_OTROS,DOC_DCTO,MOV_PRECIO,MOV_DESCUE,MOV_CANTID,MOV_IVA,"+;
+        " DOC_IMPRES,SFI_SERIMP,MOV_LISTA,TPP_INCIVA,"+;
+        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_RIF   ,DPCLIENTES.CLI_RIF   ) AS  CCG_RIF    ,"+;
+        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_NOMBRE,DPCLIENTES.CLI_NOMBRE) AS  CCG_NOMBRE ,"+;
+        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_DIR1  ,DPCLIENTES.CLI_DIR1  ) AS  CCG_DIR1   ,"+;
+        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_TEL1  ,DPCLIENTES.CLI_TEL1  ) AS  CCG_TEL1    "+;
+        " FROM DPMOVINV "+;
+        " INNER JOIN DPINV ON MOV_CODIGO=INV_CODIGO "+;
+        " INNER JOIN DPDOCCLI       ON MOV_CODSUC=DOC_CODSUC AND MOV_TIPDOC=DOC_TIPDOC AND DOC_NUMERO=MOV_DOCUME AND DOC_TIPTRA='D'"+;
+        " LEFT  JOIN DPSERIEFISCAL  ON DOC_SERFIS=SFI_LETRA  "+;
+        " LEFT  JOIN DPCLIENTES     ON DOC_CODIGO=CLI_CODIGO "+;
+        " LEFT  JOIN DPCLIENTESCERO ON CCG_CODSUC=DOC_CODSUC AND CCG_TIPDOC=DOC_TIPDOC AND CCG_NUMDOC=DOC_NUMERO "+;
+        " LEFT  JOIN DPPRECIOTIP    ON MOV_LISTA=TPP_CODIGO "+;
+        " WHERE MOV_CODSUC"+GetWhere("=",cCodSuc )+;
+        " AND   MOV_TIPDOC"+GetWhere("=",cTipDoc )+;
+        " AND   MOV_DOCUME"+GetWhere("=",cNumero )+;
+        " AND   MOV_INVACT=1 " +;
+        " GROUP BY MOV_ITEM "+;
+        " ORDER BY MOV_ITEM "
+
+   aData:=ASQL(cSql)
+
 //  IF !TYPE("oBema")="O"
 //    TDpClass():New(NIL,"oBema")
 //  ENDIF
-
-  oDp:cFileToScr:="traza\bematech.txt"
+//  oDp:cFileToScr:="traza\bematech.txt"
 
   DPEDIT():New("BemaTech","","oBema",.F.)
 
+  oBema:cFileDll:="BemaMFD2ES.dll"
   oBema:hDll    :=NIL
   oBema:cNamePrn:="BEMATECH"
-  oBema:cFileDll:="BemaFI32.dll"
   oBema:oMemo   :=nil
-  oBema:cMemo   :="Imprimiendo "+oDp:cImpFisCom+CRLF
+  oBema:cMemo   :="Imprimiendo "+oDp:cImpFisCom+CRLF+cTipDoc+"-"+cNumero+CRLF
+  oBema:cTipDoc :=cTipDoc
+  oBema:lVenta  :=(cTipDoc="FAV" .OR. cTipDoc="TIK")
+  oBema:cNumero :=cNumero
+  oBema:aData   :=aData
 
   oBema:CreateWindow(NIL,oDp:aCoors[3]/2,oDp:aCoors[4]/2,130,400+200)
 
@@ -59,18 +87,20 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
 
   oBema:hDll    :=NIL
   oBema:cNamePrn:="BEMATECH"
-  oBema:cFileDll:="BemaFI32.dll"
-
+  // oBema:cFileDll:="BemaFI32.dll"
+  
   oBema:cEstatus:=""
   oBema:oFile   :=NIL
   oBema:lMsgErr :=lMsgErr
   oBema:lErr    :=.F. // no genera ninguna Incidencia
-  oBema:cFileLog:="TEMP\"+cTipDoc+ALLTRIM(cTicket)+".LOG"
+  oBema:cFileLog:="TEMP\"+cTipDoc+ALLTRIM(cTicket)+"_"+LSTR(SECONDS())+".LOG"
   oBema:lShow   :=lShow
   oBema:cError  :=""
   oBema:lDemo   :=.T.
-  oBema:SETSCRIPT("DLL_BEMATECH")
-
+  oBema:nRet    :=0
+  oBema:lError  :=.F.
+  oBema:SETSCRIPT() //"DLL_BEMATECH")
+  oBema:cSql    :=cSql
 
   cFileLog:=oBema:cFileLog
 
@@ -101,19 +131,150 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
   ENDIF
 
   // Verifica el Estatus de la Impresora
-  uBuf  := 0
-  oBema:nRet  := BmFlagFiscal(@uBuf) // Verifica si hay Cupones
+  oBema:uBuf  := 0
+  oBema:nRet  :=oBema:BmFlagFiscal(oBema:uBuf) // Verifica si hay Cupones
+  oBema:cError:=oBema:BEMA_ERROR(oBema:nRet,.T.,oBema:oMemo)
+  
+  uBuf:=oBema:uBuf  
 
-  oBema:cError:=oBema:Bema_Error(oBema:nRet,.T.,oBema:oMemo)
+  IF uBuf=0
+     oBema:oMemo:Append("Imprimiendo, Estatus OK"+CRLF)
+  ENDIF
 
-  oDp:cFileToScr:=nil
+  IF uBuf>0 .AND. (uBuf/1)%2=1
+
+       MensajeInfo("Hay Cupon Abierto"+LSTR(uBuf)," Es necesario Cerrarlo")
+
+       // puede ser cancelado
+
+       lOpen:=.F.
+
+       oBema:nRet:=oBema:BmCanCupom()
+       oBema:cError:=oBema:BEMA_ERROR(oBema:nRet,.T.,oBema:oMemo)
+
+       IF Empty(oBema:cError)
+          oBema:oMemo:Append("Cupon Cancelado"+CRLF)
+//        MensajeErr("Cupon Cancelado")
+       ENDIF
+
+       uBuf:=0
+
+   ENDIF
+
+   IF uBuf>0 .AND. (uBuf/2)%2=1
+
+       MensajeInfo("Cupon sin Pago, Es Necesio Pagar o Cancelar <Anular>")
+       // puede ser cancelado
+
+       lOpen:=.F.
+
+       oBema:nRet  :=oBema:BmCanCupom()
+       oBema:cError:=oBema:BEMA_ERROR(oBema:nRet,.T.,oBema:oMemo)
+
+       IF Empty(oBema:cError)
+          oBema:oMemo:Append("Cupon Cancelado"+CRLF)
+//        MensajeErr("Cupon Cancelado")
+       ENDIF
+
+   ENDIF
+
+   IF uBuf>0 .AND. (uBuf/4)%2=1
+
+     MensajeInfo("Horario de Verano, Solo Brasil")
+
+   ENDIF
+
+   IF uBuf>0 .AND. (uBuf/8)%2=1
+
+     MensajeInfo("Horario de Verano, Solo Brasil")
+
+   ENDIF
+
+   IF uBuf>0 .AND. (uBuf/16)%2=1
+
+       MensajeInfo("Sin determinaci¢n")
+
+   ENDIF
+
+   IF uBuf>0 .AND. (uBuf/32)%2=1
+       oBema:nRet  :=oBema:BmCanCupom()
+       oBema:cError:=oBema:BEMA_ERROR(oBema:nRet,.T.,oBema:oMemo)
+   ENDIF
+
+   IF uBuf>0 .AND. (uBuf/128)%2=1
+
+       MensajeInfo("No hay Espacio en Memoria Fiscal")
+       MensajeErr("Cambie la Impresora por una Nueva")       
+
+       RETURN .T.
+
+   ENDIF
+
+   IF !Empty(oBema:cError)
+      oBema:BEMA_CLOSE()
+      RETURN .F.
+   ENDIF
 
   // Asignar Moneda
-  oBema:nRet:=oBema:BmSimboloMoneda(oDp:cMoneda)
+  oBema:nRet  :=oBema:BmSimboloMoneda(oDp:cMoneda)
+  oBema:cError:=oBema:BEMA_ERROR(oBema:nRet,.T.,oBema:oMemo)
 
-  oBema:cError:=oBema:Bema_Error(oBema:nRet,.T.,oBema:oMemo)
+  cAlicuota:=SPACE(79)
+  oBema:BemaLeerAlicuota(@cAlicuota)
+
+
+  IF !Empty(oDp:cFileToScr)
+    oDp:cFileToScr:=nil
+  ENDIF
+
+  oBema:BEMA_CLOSE()
+
+RETURN .T.
+
+FUNCTION BEMA_CLOSE()
+  LOCAL lSave:=.F.,cMemo
+  LOCAL cTipo:=IF(oBema:lError,"NIMP","RAUD")
+
+  IF !Empty(oDp:cFileToScr)
+    oDp:cFileToScr:=nil
+  ENDIF
+
   oBema:oFile:Close()
-  oBema:Error()
+  oBema:Close()
+
+  IF oBema:lError .OR. oDp:lImpFisRegAud
+     lSave:=.T.
+  ENDIF
+
+  IF lSave
+
+    cMemo:=MemoRead(oBema:cFileLog)+CRLF+oBema:cSql
+
+    AUDITAR(cTipo , NIL ,"DPDOCCLI" , cTipDoc+cNumero )
+
+    nNumero:=SQLINCREMENTAL("DPAUDITOR","AUD_NUMERO","AUD_SCLAVE"+GetWhere("=","DLL_BEMATECH"))
+    oTable:=OpenTable("SELECT * FROM DPAUDITOR",.F.)
+    oTable:Append()
+    oTable:Replace("AUD_FECHAS",oDp:dFecha    )
+    oTable:Replace("AUD_FECHAO",DPFECHA()     )
+    oTable:Replace("AUD_HORA  ",HORA_AP()     )
+    oTable:Replace("AUD_TABLA ","DPDOCCLI"    )
+    oTable:Replace("AUD_CLAVE ",cCodSuc+cTipDoc+cNumero)
+    oTable:Replace("AUD_USUARI",oDp:cUsuario  )
+    oTable:Replace("AUD_ESTACI",oDp:cPcName   )
+    oTable:Replace("AUD_IP"    ,oDp:cIpLocal  )
+    oTable:Replace("AUD_TIPO"  ,cTipo         ) // No impreso/Anulado
+    oTable:Replace("AUD_MEMO"  ,cMemo         )
+    oTable:Replace("AUD_SCLAVE","DLL_BEMATECH")
+    oTable:Replace("AUD_NUMERO",nNumero       )
+    oTable:Commit()
+    oTable:End(.T.)
+
+  ENDIF
+
+  IF oDp:lImpFisModVal .OR. oBema:lError
+    VIEWRTF(oBema:cFileLog,"Documento "+oBema:cTipDoc+oBema:cNumero)
+  ENDIF
 
 RETURN .T.
 
@@ -165,32 +326,11 @@ RETURN .T.
 FUNCTION BEMA_INI()
   LOCAL nRet,cError:="",I
   LOCAL cWinDir :="" // GetWinDir()+"\System32\"
-  LOCAL cFileDll:="bemafi32.dll"
-  LOCAL aDlls:={}
 
   If( oDp:lBema_Demo == nil, oDp:lBema_Demo := .T., ) ; If( oDp:aBema_Tasas == nil, oDp:aBema_Tasas := {}, );
 
-/*
-  IF !File(cFileDll)
-
-     AADD(aDlls,"bemafi32.dll")
-     AADD(aDlls,"bemafi32.ini")
-
-     FOR I := 1 TO len(aDlls)
-
-       IF !File(cWinDir+aDlls[I])
-         __COPYFILE("BEMATECH\"+aDlls[I],cWinDir+aDlls[I])
-       ENDIF
-
-     NEXT
-
-  ENDIF
-
-  If( oDp:nBemaDll == nil, oDp:nBemaDll := LoadLibrary("bemafi32.dll"), ) ;
-*/
-  nRet:=BmPrintLig()
-
-  cError:=BEMA_ERROR(nRet,.F.)
+  oBema:nRet:=oBema:BmPrintLig()
+  oBema:cError:=oBema:Bema_Error(oBema:nRet,.T.,oBema:oMemo)
 
 RETURN cError
 
@@ -315,11 +455,11 @@ FUNCTION BmAbreCup( cData )
   LOCAL uResult := 0
 
   IF !oDp:lImpFisModVal
-    LOCAL cFarProc:= GetProcAdd(oDp:nBemaDLL, If( Empty( "Bematech_FI_AbreComprobanteDeVenta" ) == .T., "BmAbreCup", "Bematech_FI_AbreComprobanteDeVenta" ), .T., 7,9 )
-    LOCAL uResult := FWCallDLL( cFarProc,cData )
+    cFarProc:= GetProcAdd(oDp:nBemaDLL, If( Empty( "Bematech_FI_AbreComprobanteDeVenta" ) == .T., "BmAbreCup", "Bematech_FI_AbreComprobanteDeVenta" ), .T., 7,9 )
+    uResult := FWCallDLL( cFarProc,cData )
   ENDIF
 
-  oBema:oFile:AppStr("cData->"+CTOO(cData,"C")+", nResult="+CTOO(uResult,"C")+CRLF)
+  oBema:oFile:AppStr("BmAbreCup( cData )"+CRLF+"cData->"+CTOO(cData,"C")+", nResult="+CTOO(uResult,"C")+CRLF)
 
 RETURN uResult
 
@@ -333,8 +473,9 @@ FUNCTION BmFlagFiscal( FlagFiscal )
   ENDIF
 
   oBema:FlagFiscal:=FlagFiscal
+  oBema:uBuf      :=FlagFiscal
 
-  oBema:oFile:AppStr("BmFlagFiscal,1->"+CTOO(FlagFiscal,"C")+" nResult="+CTOO(uResult,"C")+CRLF)
+  oBema:oFile:AppStr("BmFlagFiscal( FlagFiscal )"+CRLF+"BmFlagFiscal->"+CTOO(FlagFiscal,"C")+CRLF+" nResult="+CTOO(uResult,"C")+CRLF)
 
 RETURN uResult
 
@@ -371,8 +512,8 @@ FUNCTION BemaLeerAlicuota( cTasas )
   ENDIF
 
   oBema:cLeeTasas:=cTasas
-  oBema:oFile:AppStr("cTasas->"+CTOO(cTasas,"C")+CRLF+","+;
-                     "nResult="+CTOO(uResult,"C")
+  oBema:oFile:AppStr("cTasas->"+CTOO(cTasas ,"C")+CRLF+","+;
+                     "nResult="+CTOO(uResult,"C"))
 
 RETURN uResult
 
@@ -387,7 +528,7 @@ FUNCTION BemaProgAlicuota( cTasas )
   ENDIF
 
   oBema:oFile:AppStr("cTasas->"+CTOO(cTasas,"C")+CRLF+","+;
-                     "nResult="+CTOO(uResult,"C")
+                     "nResult="+CTOO(uResult,"C"))
 
 
 RETURN uResult
@@ -396,7 +537,6 @@ FUNCTION BemaReporteZeta( Dt,Hs )
   LOCAL cFarProc := NIL
   LOCAL uResult  := 0 // Modo Validación
  
-
   IF !oDp:lImpFisModVal
      cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_ReduccionZ" ) == .T., "BemaReporteZeta", "Bematech_FI_ReduccionZ" ), .T., 7,9,9 )
      uResult := FWCallDLL( cFarProc,Dt,Hs )
@@ -414,7 +554,7 @@ FUNCTION BmSubTotal( SubTotal )
   LOCAL uResult  := 0 // Modo Validación
 
   IF !oDp:lImpFisModVal
-    cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_SubTotal" ) == .T., "BmSubTotal", "Bematech_FI_SubTotal" ), .T., 7,9 ) ;
+    cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_SubTotal" ) == .T., "BmSubTotal", "Bematech_FI_SubTotal" ), .T., 7,9 ) 
     uResult := FWCallDLL( cFarProc,SubTotal )
   ENDIF
 
@@ -488,7 +628,7 @@ FUNCTION BmLeituraX( )
   LOCAL uResult  := 0 // Modo Validación
 
   IF !oDp:lImpFisModVal
-  	cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_LecturaX" ) == .T., "BmLeituraX", "Bematech_FI_LecturaX" ), .T., 7 ) ;
+  	cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_LecturaX" ) == .T., "BmLeituraX", "Bematech_FI_LecturaX" ), .T., 7 ) 
   	uResult := FWCallDLL( cFarProc )
   ENDIF
 
