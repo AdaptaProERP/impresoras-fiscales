@@ -15,7 +15,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
   LOCAL oSerFis :=NIL
   LOCAL lDemo   :=(cTipDoc=NIL)
   LOCAL uBuf,nClrText:=0,lSave:=.F.,cMemo,cTipo:="",cSql:="",nNumero,oTable
-  LOCAL cFecha,cHora,cAlicuota,aData:={}
+  LOCAL cFecha,cHora,cAlicuota:="",aData:={},lOpen:=.F.
 
   DEFAULT cCodSuc:=oDp:cSucursal,;
           cTipDoc:="FAV",;
@@ -36,12 +36,12 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
 
   cTicket:=cNumero 
 
-  cSql:=" SELECT MOV_ASOTIP,MOV_ASODOC,MOV_FCHVEN,MOV_DOCUME,MOV_CODIGO,INV_DESCRI,MOV_TOTAL,DOC_OTROS,DOC_DCTO,MOV_PRECIO,MOV_DESCUE,MOV_CANTID,MOV_IVA,"+;
-        " DOC_IMPRES,SFI_SERIMP,MOV_LISTA,TPP_INCIVA,"+;
+  cSql:=" SELECT INV_DESCRI,MOV_TOTAL,MOV_CANTID,MOV_PRECIO,5 AS CINCO,MOV_CODIGO,MOV_IVA,MOV_TIPIVA,9 AS NUEVE,MOV_UNDMED,MOV_CXUND,MOV_CODVEN,MOV_DESCUE,MOV_CAPAP,MOV_LOTE,"+;
         " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_RIF   ,DPCLIENTES.CLI_RIF   ) AS  CCG_RIF    ,"+;
         " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_NOMBRE,DPCLIENTES.CLI_NOMBRE) AS  CCG_NOMBRE ,"+;
         " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_DIR1  ,DPCLIENTES.CLI_DIR1  ) AS  CCG_DIR1   ,"+;
-        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_TEL1  ,DPCLIENTES.CLI_TEL1  ) AS  CCG_TEL1    "+;
+        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_TEL1  ,DPCLIENTES.CLI_TEL1  ) AS  CCG_TEL1   ,"+;
+        " SFI_SERIMP "+;
         " FROM DPMOVINV "+;
         " INNER JOIN DPINV ON MOV_CODIGO=INV_CODIGO "+;
         " INNER JOIN DPDOCCLI       ON MOV_CODSUC=DOC_CODSUC AND MOV_TIPDOC=DOC_TIPDOC AND DOC_NUMERO=MOV_DOCUME AND DOC_TIPTRA='D'"+;
@@ -56,8 +56,10 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
         " GROUP BY MOV_ITEM "+;
         " ORDER BY MOV_ITEM "
 
-   aData:=ASQL(cSql)
+   oTable:=OpenTable(cSql,.T.)
+   aData:=oTable:aDataFill // ASQL(cSql)
 
+// ViewArray(aData)
 //  IF !TYPE("oBema")="O"
 //    TDpClass():New(NIL,"oBema")
 //  ENDIF
@@ -216,27 +218,63 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
    ENDIF
 
   // Asignar Moneda
-  oBema:nRet  :=oBema:BmSimboloMoneda(oDp:cMoneda)
+  oBema:nRet  :=oBema:SimboloMoneda(oDp:cMoneda)
   oBema:cError:=oBema:BEMA_ERROR(oBema:nRet,.T.,oBema:oMemo)
 
   cAlicuota:=SPACE(79)
-  oBema:BemaLeerAlicuota(@cAlicuota)
+  oBema:bmLeerAlicuota(cAlicuota)
 
+  oBema:cCliente:=PADR(oTable:CCG_NOMBRE,41)+PADR(oTable:CCG_RIF,18)
+
+  IF oBema:lVenta .AND. !lOpen
+
+    oBema:nRet:=oBema:BmAbreCup(oBema:cCliente)
+
+  ENDIF
+
+  IF !oBema:lVenta
+
+     oBema:cSerie  :=PADR(oTable:SFI_SERIMP,13) // STRZERO(1,13) // Numero de Serie de la Impresora
+     oBema:cRif    :=PADR(oTable:CCG_RIF,15)
+     // cCliente:=PADR("Nombre",39)
+     oBema:cCupon  :=STRZERO(1,6)
+
+     oBema:cDia    :=STRZERO(DAY(oDp:dFecha)  ,2)
+     oBema:cMes    :=STRZERO(MONTH(oDp:dFecha),2)
+     oBema:cAno    :=RIGHT(STRZERO(YEAR(oDp:dFecha) ,4),2)
+
+     oBema:cHora   :=_VECTOR(TIME(),":")
+     oBema:cMin    :=oBema:cHora[2]
+     oBema:cSeg    :=oBema:cHora[3]
+     oBema:cHora   :=oBema:cHora[1]
+
+     oBema:nRet  :=oBema:BmAbreNotaDeCredito(oBema:cCliente,oBema:cSerie,oBema:cRif,oBema:cDia,oBema:cMes,oBema:cAno,oBema:cHora,oBema:cMin,oBema:cSeg,oBema:cCupon)
+     oBema:cError:=oBema:BEMA_ERROR(oBema:nRet,.T.,oBema:oMemo)
+
+   ENDIF
+
+
+   IF !Empty(oDp:cFileToScr)
+    oDp:cFileToScr:=nil
+   ENDIF
+
+   oBema:BEMA_CLOSE()
+
+RETURN .T.
+
+FUNCTION BEMA_CLOSE()
+  LOCAL lSave:=.F.,cMemo:=""
+  LOCAL cTipo:=IF(oBema:lError,"NIMP","RAUD")
 
   IF !Empty(oDp:cFileToScr)
     oDp:cFileToScr:=nil
   ENDIF
 
-  oBema:BEMA_CLOSE()
+  cMemo:=""
+  AEVAL(DIRECTORY("TEMP\*.ERR"),{|a,n,cLine| cLine:=MEMOREAD("TEMP\"+a[1]),MsgMemo(cLine),cMemo:=cMemo+cLine+CRLF})
 
-RETURN .T.
-
-FUNCTION BEMA_CLOSE()
-  LOCAL lSave:=.F.,cMemo
-  LOCAL cTipo:=IF(oBema:lError,"NIMP","RAUD")
-
-  IF !Empty(oDp:cFileToScr)
-    oDp:cFileToScr:=nil
+  IF !Empty(cMemo)
+    oBema:oFile:Append(cMemo+CRLF)
   ENDIF
 
   oBema:oFile:Close()
@@ -392,7 +430,7 @@ FUNCTION BEMA_END()
   ENDIF
 
 RETURN .T.
-
+/*
 PROCE XBEMA()
   LOCAL nRet  ,cRif:=PADR("Nombre del Cliente",41)+PADR("RIF",18)
   LOCAL nNumImp:=0,I,uBuf,cTasas:=SPACE(79)
@@ -400,11 +438,11 @@ PROCE XBEMA()
   uBuf := 0
   nRet := BmFlagFiscal(@uBuf)
 
-  BemaLeerAlicuota(@cTasas)
+  bm:BemaLeerAlicuota(@cTasas)
   nRet := BmAbreCup(cRif)
 
 RETURN NIL
-
+*/
 FUNCTION CAMBIARTASAS()
 
   WQout( { "Es necesario Emitir Reporte Z" } )
@@ -489,7 +527,8 @@ FUNCTION BmFechaCup( FormaPgto,Acrescimo,TipoAcresc,ValorAcresc,ValorPago,Mensag
      uResult := FWCallDLL( cFarProc,FormaPgto,Acrescimo,TipoAcresc,ValorAcresc,ValorPago,Mensagem )
   ENDIF
 
-  cLine:="FormaPgto->"  +CTOO(FormaPgto  ,"C")+","+;
+  cLine:="BmFechaCup( FormaPgto,Acrescimo,TipoAcresc,ValorAcresc,ValorPago,Mensagem )"+CRLF+;
+         "FormaPgto->"  +CTOO(FormaPgto  ,"C")+","+;
          "Acrescimo->"  +CTOO(Acrescimo  ,"C")+","+;
          "TipoAcresc->" +CTOO(TipoAcresc ,"C")+","+;
          "ValorAcresc->"+CTOO(ValorAcresc,"C")+","+;
@@ -501,7 +540,7 @@ FUNCTION BmFechaCup( FormaPgto,Acrescimo,TipoAcresc,ValorAcresc,ValorPago,Mensag
 
 RETURN uResult
 
-FUNCTION BemaLeerAlicuota( cTasas )
+FUNCTION bmLeerAlicuota( cTasas )
   LOCAL cFarProc := NIL
   LOCAL uResult  := 0 // Modo Validación
   LOCAL cLine
@@ -512,8 +551,9 @@ FUNCTION BemaLeerAlicuota( cTasas )
   ENDIF
 
   oBema:cLeeTasas:=cTasas
-  oBema:oFile:AppStr("cTasas->"+CTOO(cTasas ,"C")+CRLF+","+;
-                     "nResult="+CTOO(uResult,"C"))
+  oBema:oFile:AppStr("bmLeerAlicuota( cTasas )"+CRLF+;
+                     "cTasas->"+CTOO(cTasas ,"C")+","+CRLF+;
+                     "nResult="+CTOO(uResult,"C")+CRLF)
 
 RETURN uResult
 
@@ -972,7 +1012,7 @@ FUNCTION BmTfStatus( Operacao )
 
 RETURN uResult
 
-FUNCTION BmSimboloMoneda( cMoneda )
+FUNCTION SimboloMoneda( cMoneda )
   LOCAL cFarProc:= NIL
   LOCAL uResult := 0
 
@@ -981,7 +1021,7 @@ FUNCTION BmSimboloMoneda( cMoneda )
      uResult  := FWCallDLL( cFarProc,cMoneda )
   ENDIF
 
-  oBema:oFile:AppStr("BmSimboloMoneda( cMoneda )"+CRLF+;
+  oBema:oFile:AppStr("SimboloMoneda( cMoneda )"+CRLF+;
                      "cMoneda->" +CTOO(cMoneda ,"C")+","+CRLF+;
                      "nResult="  +CTOO(uResult  ,"C")+CRLF)
 
