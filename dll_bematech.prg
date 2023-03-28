@@ -26,9 +26,9 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
   LOCAL cDia, cMes, cAno, cHora, cMin, cSeg, cCu
   LOCAL cNombre, cRif, cDir1, cDir2, cTel1, cAlicuota
   LOCAL cMsg, cMensaje1:=SPACE(48), cMensaje2:=SPACE(48), cMensaje3:=SPACE(48)
-  LOCAL cVALOR:=MYSQLGET("DPHISMON","HMN_VALOR","HMN_CODIGO"+GetWhere("=","USD")+"  ORDER BY CONCAT(HMN_FECHA,HMN_HORA) DESC LIMIT 1")
+  LOCAL cVALOR:="" // MYSQLGET("DPHISMON","HMN_VALOR","HMN_CODIGO"+GetWhere("=","USD")+"  ORDER BY CONCAT(HMN_FECHA,HMN_HORA) DESC LIMIT 1")
   // LOCAL cCodBema:='11.111.111-11'
-  LOCAL oBema, cBema,cFileLog,aMemo:={}
+  LOCAL oBema, cBema,cFileLog,aMemo:={},aPagos:={},I
   LOCAL nDivisa:=0
   //LOCAL error:=.F.
 
@@ -145,10 +145,12 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
 
      oBema:cError:="Documento fué Impreso"
      oBema:oFile:AppStr(oBema:cError+CRLF)
-     oTable:End()
-     BEMA_CLOSE()
 
-     RETURN .F.
+     IF !oDp:lImpFisModVal
+       oTable:End()
+       BEMA_CLOSE()
+       RETURN .F.
+     ENDIF
 
   ENDIF
   
@@ -224,11 +226,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
     cTipDesc := "%" // %=Relativo Y $=Absoluto
     cValDesc := STRZERO(oTable:MOV_DESCUE*100,4)
 
-    IF lVenta
-      iRet:=BmVendItem( PADR(cCodigo,13), PADR(cDescr,29), PADR(cIva,05), cTipCant, cCantid, 2, cPrecio, cTipDesc, cValDesc )
-    ELSE
-      iRet:=BmVendItem( PADR(cCodigo,13), PADR(cDescr,29), PADR(cIva,05), cTipCant, cCantid, 2, cPrecio, cTipDesc, cValDesc )
-    ENDIF 
+    iRet:=BmVendItem( PADR(cCodigo,13), PADR(cDescr,29), PADR(cIva,05), cTipCant, cCantid, 2, cPrecio, cTipDesc, cValDesc )
 
     oTable:DbSkip()
 
@@ -257,14 +255,16 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
      cError:=Bema_Error(iRet,.T.)
     //BemaError(cError)
 
-   ELSE
-
-     cPago:=STRZERO((nTotal)*100,14)
-     iRet:=BmFormasPag(PADR("Efectivo BS" ,16),cPago) // PAGO DIRECTO EN BS SIN IGTF
-     cError:=Bema_Error(iRet,.T.)
-     //BemaError(cError)
-
    ENDIF
+
+   // Pago en Bs
+   aPagos:=EJECUTAR("BEMATECH_PAGOS",cCodSuc,cTipDoc,cNumero)
+
+   FOR I=1 TO LEN(aPagos)
+     cPago:=STRZERO(aPagos[I,2]*100,14)
+     iRet:=BmFormasPag(PADR(aPagos[I,1],16),cPago) // Pago en Bs
+     cError:=Bema_Error(iRet,.T.)
+   NEXT I
    
 /*
    cMsg:=PADR("Ticket : "+oTable:DOC_NUMERO,48)+;
@@ -514,7 +514,7 @@ FUNCTION BEMA_INI()
 
    iRet:=BmPrintLig()
 
-   cError:=BEMA_ERROR(iRet,.F.)
+   // cError:=BEMA_ERROR(iRet,.F.)
    cError:=BEMA_ERROR(iRet,.T.,.T.)
 
    IF "Cupón fiscal abierto" $ cError
@@ -562,37 +562,49 @@ FUNCTION BmCanCupom()
 RETURN uResult
 
 FUNCTION BEMA_ERROR(iRet,lShow)
- LOCAL cError:=""
+  LOCAL cError:=""
 
- If( lShow == nil, lShow := .T., ) ;
+  DEFAULT iRet:=1
 
- IF iRet=1
-  RETURN ""
- ENDIF
+  If( lShow == nil, lShow := .T., ) 
 
- DO CASE
+  IF iRet=1
+    RETURN ""
+  ENDIF
 
-    CASE iRet= -1
-      cError:="Parámetro inválido"
-    CASE iRet= -2
-      cError:="Parámetro Inválido"
-    CASE iRet=-3
-      cError:="Aliquota no programada"
-    CASE iRet=-4
-      cError:="Archivo BemaFI32.INI no encontrado, copielo en "+GetWinDir()+"\System32\"
-    CASE iRet=-5
-      cError:="Error en Apertura, Posiblemente ya está Abierto el Puerto"
-    CASE iRet=-6
-      cError:="Ninguna Impresora fué Encontrada, Verifique si está Encendida o Conectada al Cable Serial"
-    CASE iRet = -8
-      cError:="Error al Crear o Grabar en el Archivo status.txt o retorno.txt "
-  ENDCASE
+  IF iRet= -1
+    cError:="Parámetro inválido"
+  ENDIF
 
- cError:="Error:"+LSTR(iRet)+", "+cError
+  IF iRet= -2
+    cError:="Parámetro Inválido"
+  ENDIF
 
- oBema:oFile:AppStr(cError+CRLF)
+  IF iRet=-3
+     cError:="Aliquota no programada"
+  ENDIF
 
- IF lShow
+  IF iRet=-4
+     cError:="Archivo BemaFI32.INI no encontrado, copielo en "+GetWinDir()+"\System32\"
+  ENDIF
+
+  IF iRet=-5
+     cError:="Error en Apertura, Posiblemente ya está Abierto el Puerto"
+  ENDIF
+
+  IF iRet=-6
+     cError:="Ninguna Impresora fué Encontrada, Verifique si está Encendida o Conectada al Cable Serial"
+  ENDIF
+
+  IF iRet = -8
+     cError:="Error al Crear o Grabar en el Archivo status.txt o retorno.txt "
+  ENDIF
+
+  cError:="Error:"+CTOO(iRet,"C")+", "+cError
+
+  oBema:oFile:AppStr(cError+CRLF)
+
+  IF lShow
 
    IF !oDp:lImpFisModVal
      MensajeErr(cError,"Error Impresora Bematech")
