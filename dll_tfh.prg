@@ -68,9 +68,15 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption,cCmd)
     cData   :=EJECUTAR("TFHKA_DATA",cCodSuc,cTipDoc,cNumero,cOption)
     cFilePag:="temp\"+cTipDoc+cNumero+".pag"
     
-    IF !oDp:lImpFisModVal 
+    IF .T. // JN 21/11/2023 !oDp:lImpFisModVal 
        aData   :=STRTRAN(cData,CRLF,CHR(10))
        aData   :=_VECTOR(aData,CHR(10))
+    ENDIF
+
+    IF Empty(aData)
+       MsgMemo("Documento "+cTipDoc+" "+cNumero+" no tiene Items")
+       TFH_END()
+       RETURN .F.
     ENDIF
 
  
@@ -385,8 +391,14 @@ RETURN uResult
 // Envio de Comandos para la Impresión 
 */
 FUNCTION DpSendCmd(nStatus,nError,cCmd)
-  LOCAL cFarProc := GetProcAddress(oDp:nTFHDLL,If(Empty("SendCmd" ) == .t.,"DpSendCmd","SendCmd" ),.T.,7,10 ,10,9 ) 
-  LOCAL uResult  := CallDLL(cFarProc,@nStatus,@nError,@cCmd ) 
+  LOCAL cFarProc
+  LOCAL uResult 
+
+  // 21/11/2023, modo validacion requiere la traza
+  IF !oDp:lImpFisModVal
+     cFarProc := GetProcAddress(oDp:nTFHDLL,If(Empty("SendCmd" ) == .t.,"DpSendCmd","SendCmd" ),.T.,7,10 ,10,9 ) 
+     uResult  := CallDLL(cFarProc,@nStatus,@nError,@cCmd ) 
+  ENDIF
 
   oTFH:nStatus:=nStatus
   oTFH:nError :=nError
