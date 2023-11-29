@@ -156,7 +156,7 @@ PROCE MAIN(cTipDoc,cNumero)
      cDescri   :=ALLTRIM(PADR(oTable:INV_DESCRI,20))
 
      // Origen de Cuotas (Club,Colegios,Agremiados), la descripción incluye la fecha del Servicio
-     IF oTable:MOV_ASOTIP="CUO" .AND. !Empty(oTable:MOV_FCHVEN)
+     IF (oTable:MOV_ASOTIP="CUO" .OR. oTable:MOV_ASOTIP="ALQ") .AND. !Empty(oTable:MOV_FCHVEN)
         cDescri:=PADR(oTable:INV_DESCRI,20-6)+"-"+UPPER(LEFT(CMES(oTable:MOV_FCHVEN),3))+RIGHT(LSTR(YEAR(oTable:MOV_FCHVEN),4),2)
      ENDIF
 
