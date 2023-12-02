@@ -21,7 +21,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
 
    oDp:cImpFiscalSqlPagos:=cSql
 
-   nLenP:=oDp:nImpFisEnt        // Definible Ancho Numérico
+   nLenP:=oDp:nImpFisEntPre     // Antes 23/11/2023 oDp:nImpFisEnt        // Definible Ancho Numérico
    nLenP:=IF(nLenP=0,10,nLenP)  // Longitud del precio
 
    cWhere:="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
@@ -70,6 +70,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
 
    oTable:=OpenTable(cSql,.T.)
 
+   oDp:aData:=ACLONE(oTable:aDataFill)
+
    IF oTable:RecCount()=0
       oTable:End()
       cText:=""
@@ -113,15 +115,20 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
      nIva     :=1+(oTable:MOV_IVA/100)
      cCant    :=STRZERO(oTable:MOV_CANTID*1000,8,0)
      // Precio Incluye IVA, Debe separarlo
-     IF oTable:TPP_INCIVA
+
+     // 28/11/2023 en todos los casos la impresora calcula el IVA y la cuenta viene directamente el formulario de facturacion
+     IF oTable:TPP_INCIVA .AND. .F.
         nPrecio  :=(oTable:MOV_TOTAL/oTable:MOV_CANTID)/nIva 
      ELSE
         nPrecio  :=(oTable:MOV_TOTAL/oTable:MOV_CANTID)
      ENDIF
 
      cPrecio  :=STRZERO(nPrecio*100,nLenP,0)
-     cIva    :=IIF(oTable:MOV_IVA<>0,CHR(33),CHR(32))
-     cDescri  :=ALLTRIM(PADR(oTable:INV_DESCRI+SPACE(40),40))
+     cIva     :=IIF(oTable:MOV_IVA<>0,CHR(33),CHR(32))
+
+     // ? cIva,ASC(cIva),LEN(cPrecio),cPrecio
+     // cDescri  :=ALLTRIM(PADR(oTable:INV_DESCRI+SPACE(40),40))
+     cDescri  :=PADR(oTable:INV_DESCRI,40)
 
      IF cTipDoc = "DEV" .OR. cTipDoc="CRE"
         cText    :=cText+"d"+cIva+cPrecio+cCant+cDescri+CRLF

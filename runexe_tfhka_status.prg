@@ -17,6 +17,8 @@ PROCE MAIN(cSerie)
      RETURN .T.
   ENDIF
 
+  EJECUTAR("IntTFHKA_DOWNLOAD") // 02/12/2023 descargar programa binario
+
   IF !FILE(cFileExe) 
      MsgMemo("Necesario Programa "+cFileExe+CRLF+"Descarguelo desde "+CRLF+cUrl+CRLF+"Descomprimalo en la carpeta "+cDir,"Dirección URL Copiada en ClipBoad")
      SHELLEXECUTE(oDp:oFrameDp:hWND,"open",cUrl)
