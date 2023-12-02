@@ -25,6 +25,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
 
   IF !TYPE("oTFHKA")="O"
      TDpClass():New(NIL,"oTFHKA")
+     EJECUTAR("DLL_TFHKA_DOWNLOAD") // Valida y descarga tfhkaif.dll
   ENDIF
 
   oTFHKA:hDll    :=NIL

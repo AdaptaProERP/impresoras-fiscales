@@ -19,6 +19,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption,cCmd)
           cOption   :="3",;
           cCmd      :=""
 
+  EJECUTAR("DLL_TFHKA_DOWNLOAD") // Valida y descarga tfhkaif.dll
+
   WHILE EMPTY(TFH_INI(oDp:cImpFisCom)) .OR. oTFH:lError
 
     IF oDp:lImpFisModVal
@@ -299,6 +301,10 @@ FUNCTION TFH_ERROR(nRet,lShow,lVerifPto)
     cError:="Error al Crear o Grabar en el Archivo status.txt o retorno.txt "
   ENDIF
 
+  IF nRet = 128
+    cError:="Defina la trama del campo Precio y/o cantidad"
+  ENDIF
+
   IF nRet = 137
     cError:="Impresora No Conectada o Apagada"
   ENDIF
@@ -306,6 +312,9 @@ FUNCTION TFH_ERROR(nRet,lShow,lVerifPto)
   IF nRet = 999
     cError:="No se puedo cargar archivo tfhkaif.dll"
   ENDIF
+
+  // ejecuta URL con las instrucciones
+  EJECUTAR("WEBRUN","https://adaptaproerp.com/impresora-fiscal-thefactory/",.F.)
 
   cError:="Error:"+LSTR(nRet)+", "+cError
 
