@@ -14,7 +14,7 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
+PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
   LOCAL cFecha:=oDp:dFecha
   LOCAL cHora :=TIME()
   LOCAL oTable, oData, cSql, cWhere, lVenta
@@ -29,7 +29,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
   LOCAL cVALOR:="" // MYSQLGET("DPHISMON","HMN_VALOR","HMN_CODIGO"+GetWhere("=","USD")+"  ORDER BY CONCAT(HMN_FECHA,HMN_HORA) DESC LIMIT 1")
   // LOCAL cCodBema:='11.111.111-11'
   LOCAL oBema, cBema,cFileLog,aMemo:={},aPagos:={},I
-  LOCAL nDivisa:=0
+  LOCAL nDivisa:=0,lResp
   //LOCAL error:=.F.
 
   PRIVATE aTipoPago:={}
@@ -43,18 +43,18 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
           lBrowse:=.T.,;
           oDp:lImpFisModVal:=.T.,;
           oDp:lImpFisRegAud:=.T.,;
-          oDp:cImpFisCom   :="BEMATECH"
+          oDp:cImpFisCom   :="BEMATECH",;
+          cCmd             :=""
 
   cWhere:="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
           "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
           "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
           "DOC_TIPTRA"+GetWhere("=","D"    )
 
-  nDivisa  :=EJECUTAR("DPDOCCLIPAGDIV",cCodSuc,cTipDoc,cNumero)
-
   IF lShow
      AEVAL(DIRECTORY("TEMP\*.ERR"),{|a,n| FERASE("TEMP\"+a[1])})
   ENDIF
+
 
   lVenta:=(cTipDoc="FAV" .OR. cTipDoc="TIK")
 
@@ -110,9 +110,32 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse)
 
   oDp:nBemaDLL:= LoadLibrary(oBema:cFileDll)
 
-  //? "SI LEE LA LIBRERIA BEMATECH: ",oDp:nBemaDLL
+  IF Empty(oDp:nBemaDLL)
+    FreeLibrary(oDp:nBemaDll)
+  ENDIF
 
+  // Comando de la Impresora, X,Z
+  IF !Empty(cCmd)
+     oBema:cFileLog:="TEMP\bematech_"+cCmd+".LOG"
+     oBema:oFile   :=TFile():New(oBema:cFileLog)
+     lResp:=BEMATECHZ()
+     iRet :=BEMA_END()
+
+     RETURN lResp
+  ENDIF
+
+  oBema:oFile:=TFile():New(oBema:cFileLog)
+
+  iRet :=BEMA_END()
+
+  //? oDp:nBemaDLL
+  //? "SI LEE LA LIBRERIA BEMATECH: ",oDp:nBemaDLL
   ////////////////////////////////////////////////////////////////
+
+RETURN .T.
+
+
+  nDivisa  :=EJECUTAR("DPDOCCLIPAGDIV",cCodSuc,cTipDoc,cNumero)
 
   cSql:=" SELECT  MOV_DOCUME,DOC_FACAFE,DOC_IMPRES,MOV_CODIGO,INV_DESCRI,MOV_TOTAL,DOC_OTROS,DOC_DCTO,DOC_TIPDOC,MOV_PRECIO,MOV_DESCUE,MOV_CANTID,MOV_IVA,MOV_CODALM,"+;
         " DOC_NUMERO,CLI_NOMBRE,CLI_RIF,CLI_DIR1,CLI_TEL1,"+;
@@ -692,11 +715,47 @@ FUNCTION IFESTATUS()
 RETURN cError
 
 FUNCTION BEMA_END()
+  LOCAL oFont
 
- IF oDp:nBemaDll<>NIL
-    FreeLibrary(oDp:nBemaDll)
-    oDp:nBemaDll:=NIL
+  IF oDp:nBemaDll<>NIL
+     FreeLibrary(oDp:nBemaDll)
+     oDp:nBemaDll:=NIL
+  ENDIF
+
+  IF TYPE("OBEMA")="O" .AND. ValType(oBema:oFile)="O"
+     oBema:oFile:End()
+     oBema:oFile:=NIL
+  ENDIF
+
+  IF oBema:lShow
+
+    DEFINE FONT oFont     NAME "Courier"   SIZE 0, -10
+
+    VIEWRTF(oBema:cFileLog,"Archivo "+oBema:cFileLog,oFont)
+
  ENDIF
+
+RETURN .T.
+
+
+FUNCTION BEMATECHZ(dT,Hs)
+   LOCAL uResult:="", cFarProc, hDLL:=oBema:hDll 
+   LOCAL cFunc  :="Bematech_FI_ReducaoZ"  // BemaReporteZeta    
+
+   DEFAULT dT:=DTOC(DATE()),;
+           Hs:=TIME()
+
+   IF !oDp:lImpFisModVal
+     cFarProc:=GetProcAddress(hDLL,cFunc,.T.,7,9 ,9 ) 
+     uResult :=CallDLL(cFarProc,dT,Hs)
+   ENDIF
+
+   IF ValType(oBema:oFile)="O"
+     oBema:oFile:AppStr(cFunc+"(dt->"+CTOO(dT,"C")+;
+                                 "hS->"+CTOO(Hs,"C")+"),Result->"+CTOO(uResult,"C")+CRLF)
+   ENDIF
+
+  SysRefresh(.T.)
 
 RETURN .T.
 
