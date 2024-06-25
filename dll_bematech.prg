@@ -475,8 +475,29 @@ FUNCTION BmAbreCupom(cCupom)
 RETURN uResult
 
 FUNCTION BmAbreNotaDeCredito( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
- LOCAL cFarProc:= GetProcAddress( oDp:nBemaDLL, If( Empty( "Bematech_FI_AbreNotaDeCredito" ) == .T., "BmAbreNotaDeCredito", "Bematech_FI_AbreNotaDeCredito" ), .T., 7,9,9,9,9,9,9,9,9,9,9 )
- LOCAL uResult := CallDLL( cFarProc,cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
+  LOCAL cFunc   :="Bematech_FI_AbreNotaDeCredito"
+  LOCAL cFarProc,uResult
+
+  IF !oDp:lImpFisModVal
+
+   cFarProc:= GetProcAddress( oDp:nBemaDLL,cFunc, .T., 7,9,9,9,9,9,9,9,9,9,9 )
+   uResult := CallDLL( cFarProc,cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
+
+  ENDIF
+
+  oBema:oFile:AppStr("BmAbreNotaDeCredito( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )"+CRLF+;
+                     "cNombre->"+CTOO(cNombre,"C")+","+CRLF+;
+                     "cSerie ->"+CTOO(cSerie ,"C")+","+CRLF+;
+                     "cRif   ->"+CTOO(cRif   ,"C")+","+CRLF+;
+                     "cDias  ->"+CTOO(cDias  ,"C")+","+CRLF+;
+                     "cMes   ->"+CTOO(cMes   ,"C")+","+CRLF+;
+                     "cAno   ->"+CTOO(cAno   ,"C")+","+CRLF+;
+                     "cHora  ->"+CTOO(cHora  ,"C")+","+CRLF+;
+                     "cMin   ->"+CTOO(cMin   ,"C")+","+CRLF+;
+                     "cSeg   ->"+CTOO(cSeg   ,"C")+","+CRLF+;
+                     "cCu    ->"+CTOO(cCu    ,"C")+","+CRLF+;
+                     "nResult=" +CTOO(uResult,"C")+CRLF)
+
 RETURN uResult
 
 FUNCTION BmVendItem( Codigo,Descricao,Aliquota,TpQte,Quantid,Decimal,ValUnit,TpDesc,ValDesc )
@@ -623,50 +644,6 @@ FUNCTION BmPrintLig()
                        "nResult="+CTOO(uResult  ,"C")+CRLF)
 
   ENDIF
-
-RETURN uResult
-
-/*
-// Cancelar Cupon
-*/
-FUNCTION BmCanCupom()
-  LOCAL cFarProc:= NIL
-  LOCAL uResult := NIL
-  LOCAL cFunc   :="Bematech_FI_CierraCupon"
-
-  IF !oDp:lImpFisModVal
-    cFarProc:= GetProcAddress( oDp:nBemaDLL, cFunc, .T., 7 )
-    uResult := CallDLL( cFarProc )
-  ENDIF
-
-  IF ValType(oBema:oFile)="O"
-
-    oBema:oFile:AppStr("BmCanCupom(),FUNCTION="+cFunc+CRLF+;
-                       "nResult="      +CTOO(uResult  ,"C")+CRLF)
-  ENDIF
-
-
-RETURN uResult
-
-/*
-// Cancelar Item
-*/
-FUNCTION BmCancItem() 
- LOCAL cFarProc:=NIL
- LOCAL uResult :=NIL
- LOCAL cFunc   :="Bematech_FI_CancelaItemAnterior" 
-
- IF !oDp:lImpFisModVal
-    cFarProc:=GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7 )
-    uResult :=CallDLL(cFarProc ) 
- ENDIF
-
- IF ValType(oBema:oFile)="O"
-
-   oBema:oFile:AppStr("BmCanCupom(),FUNCTION="+cFunc+CRLF+;
-                      "nResult="      +CTOO(uResult  ,"C")+CRLF)
-
- ENDIF
 
 RETURN uResult
 
@@ -821,7 +798,7 @@ FUNCTION BEMA_END()
      oDp:nBemaDll:=NIL
   ENDIF
 
-  IF TYPE("OBEMA")="O" .AND. ValType(oBema:oFile)="O"
+  IF TYPE("oBEMA")="O" .AND. ValType(oBema:oFile)="O"
      oBema:oFile:AppStr("BEMA_END()"+CRLF)
      oBema:oFile:End()
      oBema:oFile:=NIL
@@ -837,10 +814,33 @@ FUNCTION BEMA_END()
 
 RETURN .T.
 
+/*
+// Cancela Cupon
+*/
 FUNCTION BmCanCupom()
-  LOCAL cFunc   :="Bematech_FI_CancelaCupom"
+RETURN BMRUNFUNCION("Bematech_FI_CancelaCupom","BmCanCupom()")
+
+/*
+// Cancela Item
+*/
+FUNCTION BmCancItem()
+RETURN BMRUNFUNCION("Bematech_FI_CancelaItemAnterior","BmCancItem()")
+
+/*
+// Abrir Gaveta
+*/
+FUNCTION BmAbreGav()
+RETURN BMRUNFUNCION("Bematech_FI_AcionaGaveta","BmAbreGav()")
+
+
+/*
+// Ejecuta funciones Bematecha, ahorra uso innecesario de funciones
+*/
+FUNCTION BMRUNFUNCION(cFunc,cName)
   LOCAL uResult :=NIL
   LOCAL cFarProc:=NIL
+
+  DEFAULT cName:=""
 
   IF !oDp:lImpFisModVal
     cFarProc:= GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7 ) 
@@ -848,19 +848,11 @@ FUNCTION BmCanCupom()
   ENDIF
 
   IF ValType(oBema:oFile)="O"
-     oBema:oFile:AppStr(cFunc+",Result->"+CTOO(uResult,"C")+CRLF)
+     oBema:oFile:AppStr(cName+","+cFunc+",Result->"+CTOO(uResult,"C")+CRLF)
   ENDIF
 
 RETURN uResult
 
-/*
-
- function BmCancItem() ; local hDLL := If(ValType(oDp:nBemaDLL ) == "N",oDp:nBemaDLL,LoadLibrary("oDp:nBemaDLL" ) ) ; local uResult ; local cFarProc ; if Abs(hDLL ) > 32 ; cFarProc = GetProcAddress(hDLL,If(Empty("Bematech_FI_CancelaItemAnterior" ) == .t.,"BmCancItem","Bematech_FI_CancelaItemAnterior" ),.T.,7 ) ; uResult = CallDLL(cFarProc ) ;IIF(ValType(oDp:nBemaDLL ) == "N",,FreeLibrary(hDLL ) ); else ; MsgAlert("Error code: " + LTrim(Str(hDLL ) ) + " loading " + oDp:nBemaDLL ) ; end ; return uResult
-
-
-
- function BmAbreGav() ; local hDLL := If(ValType(oDp:nBemaDLL ) == "N",oDp:nBemaDLL,LoadLibrary("oDp:nBemaDLL" ) ) ; local uResult ; local cFarProc ; if Abs(hDLL ) > 32 ; cFarProc = GetProcAddress(hDLL,If(Empty("Bematech_FI_AcionaGaveta" ) == .t.,"BmAbreGav","Bematech_FI_AcionaGaveta" ),.T.,7 ) ; uResult = CallDLL(cFarProc ) ;IIF(ValType(oDp:nBemaDLL ) == "N",,FreeLibrary(hDLL ) ); else ; MsgAlert("Error code: " + LTrim(Str(hDLL ) ) + " loading " + oDp:nBemaDLL ) ; end ; return uResult
-*/
 FUNCTION BEMA_ZETA(dT,Hs)
    LOCAL uResult:=NIL, cFarProc
    LOCAL cFunc  :="Bematech_FI_ReducaoZ"  // BemaReporteZeta    
