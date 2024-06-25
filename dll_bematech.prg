@@ -34,10 +34,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
 
   PRIVATE aTipoPago:={}
 
-  DEFAULT cCodSuc:=oDp:cSucursal,;
-          cTipDoc:="FAV",;
-          cNumero:=SQLGETMAX("DPDOCCLI","DOC_NUMERO","DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND DOC_TIPTRA"+GetWhere("=","D"))
-
   DEFAULT lMsgErr:=.T.,;
           lShow  :=.T.,;
           lBrowse:=.T.,;
@@ -46,10 +42,26 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
           oDp:cImpFisCom   :="BEMATECH",;
           cCmd             :=""
 
-  cWhere:="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
-          "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
-          "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
-          "DOC_TIPTRA"+GetWhere("=","D"    )
+  IF Empty(cCmd)
+
+    DEFAULT cCodSuc:=oDp:cSucursal,;
+            cTipDoc:="FAV",;
+            cNumero:=SQLGETMAX("DPDOCCLI","DOC_NUMERO","DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND DOC_TIPTRA"+GetWhere("=","D"))
+
+    cWhere:="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
+            "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
+            "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
+            "DOC_TIPTRA"+GetWhere("=","D"    )
+
+
+  ELSE
+
+      
+     cCodSuc:=""
+     cTipDoc:=""
+     cNumero:=""
+
+  ENDIF
 
   IF lShow
      AEVAL(DIRECTORY("TEMP\*.ERR"),{|a,n| FERASE("TEMP\"+a[1])})
@@ -72,7 +84,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
   oBema:oFile   :=NIL
   oBema:lMsgErr :=lMsgErr
   oBema:lErr    :=.F. // no genera ninguna Incidencia
-  oBema:cFileLog:="TEMP\"+cTipDoc+ALLTRIM(cNumero)+"_"+LSTR(SECONDS())+".LOG"
   oBema:lShow   :=lShow
   oBema:cError  :=""
   oBema:lDemo   :=.T.
@@ -81,6 +92,13 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
   oBema:lImpErr :=.F.
   oBema:cTipDoc :=cTipDoc
   oBema:cNumero :=cNumero
+
+  IF !Empty(cNumero)
+    oBema:cFileLog:="TEMP\"+cTipDoc+ALLTRIM(cNumero)+"_"+LSTR(SECONDS())+".LOG"
+  ELSE
+    oBema:cFileLog:="TEMP\bematech_"+cCmd+".LOG"
+  ENDIF
+
 
   // FUNCTION BmVerEstado(ACX ,ST1,ST2 )
   oBema:ACX     :=NIL
@@ -122,7 +140,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
   */
   IF !Empty(cCmd)
 
-     oBema:cFileLog:="TEMP\bematech_"+cCmd+".LOG"
      oBema:oFile   :=TFile():New(oBema:cFileLog)
 
      cError:=BEMA_INI()
@@ -725,7 +742,7 @@ FUNCTION IFESTATUS()
  cError:= Bema_Error(nRet,.T.)
 
  // Asignar Moneda
- nRet:=BmSimboloMoneda("Bs")
+ nRet:=BmSimboloMoneda(oDp:cMoneda) // "Bs")
  //cError:= Bema_Error(nRet,.T.)
 
  IF uBuf=0
@@ -933,7 +950,37 @@ FUNCTION BEMA_TOTAL()
 
 RETURN uResult
 
+FUNCTION BmSimboloMoneda(cMoneda)
+  LOCAL cFunc:="Bematech_FI_AlteraSimboloMoeda"
+  LOCAL uResult,cFarProc 
 
+  IF !oDp:lImpFisModVal
+    cFarProc:= GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7,9 ) 
+    uResult := CallDLL(cFarProc,cMoneda ) 
+  ENDIF
+
+  IF ValType(oBema:oFile)="O"
+    oBema:oFile:AppStr("BmSimboloMoneda(cMoneda)"+cFunc+"(),Result->"+CTOO(uResult,"C")+CRLF)
+  ENDIF
+
+RETURN uResult
+
+FUNCTION BmFlagFiscal(FlagFiscal )
+  LOCAL cFunc:="Bematech_FI_FlagsFiscais"
+  LOCAL uResult,cFarProc 
+
+  IF !oDp:lImpFisModVal
+    cFarProc:= GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7,10 )
+    uResult := CallDLL(cFarProc,@FlagFiscal )
+  ENDIF
+
+  IF ValType(oBema:oFile)="O"
+    oBema:oFile:AppStr("BBmFlagFiscal(FlagFiscal )"+cFunc+"(),FlagFiscal->"+CTOO(FlagFiscal,"C")+",Result->"+CTOO(uResult,"C")+CRLF)
+  ENDIF
+
+  oBema:FlagFiscal:=FlagFiscal
+
+RETURN uResult
 
 // ADICIONALES
 
