@@ -2,41 +2,37 @@
 // Fecha/Hora : 09/11/2022
 // Propósito  : Genera la data para la Impresora Fiscal
 // Creado Por : Juan Navas/ Kelvis Escalante	
-// Llamado por: RUNEXE_TFHKA             
+// Llamado por: DPDOCCLI_PRINT      
 // Aplicación : FACTURACION CONVENCIONAL Y PUNTO DE VENTA
 // Tabla      : DPDOCCLI
+// Fecha/Hora : 01/09/2022 00:00:00
 
 #INCLUDE "DPXBASE.CH"
+#INCLUDE "FILEIO.CH"
 
 PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
    LOCAL oTable
    LOCAL cWhere:="",cFile,cSql,cText:="",cSerie:=""
-   LOCAL cUS,cNombre,cRIF,cDireccion,cTelefono,nIva:=0,cIva:="",cPrecio:="",nPrecio:=0,cCant:="",cDescri:=""
-   LOCAL aPagos  :={},nLenP:=0,nLenC:=0
+   LOCAL cUS,cNombre,cRIF,cDireccion,cTelefono,nTasa:=0,cTasa:="",cPrecio:="",nPrecio:=0,cCant:="",cDescri:=""
+   LOCAL aPagos  :={},nLenP
 
    DEFAULT cCodSuc:=oDp:cSucursal,;
            cTipDoc:="TIK",;
            cNumero:=SQLGETMAX("DPDOCCLI","DOC_NUMERO","DOC_TIPDOC"+GetWhere("=",cTipDoc)),;
            cOption:="3"
 
-   oDp:cImpFiscalSqlPagos:=cSql
+   // cOption="7" -> Anular Factura
 
-   nLenP:=oDp:nImpFisEntPre     // Antes 23/11/2023 oDp:nImpFisEnt        // Definible Ancho Numérico
+   nLenP:=oDp:nImpFisEnt        // Definible Ancho Numérico
    nLenP:=IF(nLenP=0,10,nLenP)  // Longitud del precio
 
-   nLenC:=oDp:nImpFisEntCan
-   nLenC:=IF(nLenC=0,8,nLenC)
-
-// ? nLenP,"nLenP",nLenC,"nLenC"
+   // guadamos el puerto
 
    cWhere:="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
            "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
            "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
-           "DOC_ACT"   +GetWhere("=",1      )
-
-   IF cOption="3"
-      cWhere:=cWhere+" AND DOC_TIPTRA"+GetWhere("=","D"    )
-   ENDIF
+           "DOC_ACT"   +GetWhere("=",1      )+" AND "+;
+           "DOC_TIPTRA"+GetWhere("=","D"    )
 
    IF Empty(cSerie)
       cSerie        :=SQLGET("DPDOCCLI","DOC_SERFIS",cWhere)
@@ -53,34 +49,39 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
          " IF(CCG_DIR1   IS NULL,CLI_DIR1  ,CCG_DIR1  ) AS CCG_DIR1,"+;
          " IF(CCG_TEL1   IS NULL,CLI_TEL1  ,CCG_TEL1  ) AS CCG_TEL1,"+;
          " IF(CCG_RIF    IS NULL,CLI_RIF   ,CCG_RIF   ) AS CCG_RIF ,"+;
-         " DOC_SERFIS,DOC_FACAFE,MOV_LISTA,TPP_INCIVA "+;
+         " DOC_SERFIS "+;
          " FROM DPDOCCLI "+;
          " INNER  JOIN DPMOVINV       ON MOV_CODSUC=DOC_CODSUC AND MOV_TIPDOC=DOC_TIPDOC AND DOC_NUMERO=MOV_DOCUME AND MOV_APLORG"+GetWhere("=","V")+;
          " INNER  JOIN DPINV          ON MOV_CODIGO=INV_CODIGO "+;
          " LEFT   JOIN DPCLIENTESCERO ON CCG_CODSUC=DOC_CODSUC AND CCG_TIPDOC=DOC_TIPDOC AND CCG_NUMDOC=DOC_NUMERO "+;
          " INNER  JOIN DPCLIENTES     ON DOC_CODIGO=CLI_CODIGO "+;
-         " INNER  JOIN DPPRECIOTIP       ON MOV_LISTA=TPP_CODIGO "+;
          " WHERE DOC_CODSUC"+GetWhere("=",cCodSuc)+;
          "   AND DOC_TIPDOC"+GetWhere("=",cTipDoc)+;
          "   AND DOC_NUMERO"+GetWhere("=",cNumero)+;
-         "   AND DOC_TIPTRA"+GetWhere("=","D"    )
-
-   IF cOption="3"
-      cSql:=cSql+" AND DOC_TIPTRA"+GetWhere("=","D"    )
-   ENDIF
-
-   IF Empty(cSql)
-      RETURN ""
-   ENDIF
+         "   AND DOC_TIPTRA"+GetWhere("=","D"    )+;
+         "   AND DOC_ACT"   +GetWhere("=",1      )
 
    oTable:=OpenTable(cSql,.T.)
-
-   oDp:aData:=ACLONE(oTable:aDataFill)
 
    IF oTable:RecCount()=0
       oTable:End()
       cText:=""
       RETURN 
+   ENDIF
+
+   IF ISPCPRG()
+      /*
+      // Validaciones debe tener precios de 4Bs
+      */
+      oTable:Gotop()
+      WHILE !oTable:Eof()
+         oTable:REPLACE("MOV_TOTAL",4)
+         oTable:DbSkip()
+      ENDDO
+
+      oTable:GoTop()
+      // oTable:Browse()
+
    ENDIF
 
    oTable:GoTop()
@@ -97,11 +98,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
       cText:=cText+CHR(105)+CHR(83)+CHR(42)+cNombre+CRLF
       cText:=cText+CHR(105)+CHR(70)+CHR(42)+cNumero+CRLF
       cText:=cText+CHR(105)+CHR(68)+CHR(42)+DTOC(DATE())+CRLF
-      cText:=cText+CHR(105)+CHR(73)+CHR(42)+oDp:cImpFisSer+CRLF
-
-      // "Z6C3000509"+CRLF
-      // cText:=cText+CHR(105)+CHR(73)+CHR(42)+"Factura Origen:"+oTable:DOC_FACAFE+CRLF
-      // cText:=cText+"<TEXTO_CF,"+REPL("-",40)+",0>"+CRLF
+      cText:=cText+CHR(105)+CHR(73)+CHR(42)+oDp:cImpFisSer+CRLF // "Z6C3000509"+CRLF
+      cText:=cText+"<TEXTO_CF,"+REPL("-",40)+",0>"+CRLF
 
    ELSE
 
@@ -117,58 +115,38 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
 
    WHILE !oTable:Eof()
 
-     nIva     :=1+(oTable:MOV_IVA/100)
-
-     IF oDp:nImpFisEntCan=0
-       cCant    :=STRZERO(oTable:MOV_CANTID*1000,8,0)
-     ELSE
-       cCant    :=STRZERO(oTable:MOV_CANTID*1000,nLenC,0)
-     ENDIF
-
-     // Precio Incluye IVA, Debe separarlo
-
-     // 28/11/2023 en todos los casos la impresora calcula el IVA y la cuenta viene directamente el formulario de facturacion
-     IF oTable:TPP_INCIVA .AND. .F.
-        nPrecio  :=(oTable:MOV_TOTAL/oTable:MOV_CANTID)/nIva 
-     ELSE
-        nPrecio  :=(oTable:MOV_TOTAL/oTable:MOV_CANTID)
-     ENDIF
-
+     nTasa    :=1+(oTable:MOV_IVA/100)
+     cCant    :=STRZERO(oTable:MOV_CANTID*1000,8,0)
+     nPrecio  :=(oTable:MOV_TOTAL/oTable:MOV_CANTID)/nTasa
      cPrecio  :=STRZERO(nPrecio*100,nLenP,0)
-     cIva     :=IIF(oTable:MOV_IVA<>0,CHR(33),CHR(32))
-
-     // ? cIva,ASC(cIva),LEN(cPrecio),cPrecio
-     // cDescri  :=ALLTRIM(PADR(oTable:INV_DESCRI+SPACE(40),40))
-     cDescri  :=PADR(oTable:INV_DESCRI,40)
+     cTasa    :=IIF(oTable:MOV_IVA<>0,CHR(33),CHR(32))
+     cDescri  :=ALLTRIM(PADR(oTable:INV_DESCRI+SPACE(40),40))
 
      IF cTipDoc = "DEV" .OR. cTipDoc="CRE"
-        cText    :=cText+"d"+cIva+cPrecio+cCant+cDescri+CRLF
+        cText    :=cText+"d"+cTasa+cPrecio+cCant+cDescri+CRLF
      ELSE
-        cText    :=cText+cIva+cPrecio+cCant+cDescri+CRLF
+        cText    :=cText+cTasa+cPrecio+cCant+cDescri+CRLF
      ENDIF
 
      oTable:DbSkip()
 
   ENDDO
 
+ 
   oTable:Gotop()
 
   // Cierre de los Items
-  // Antes era "3" ahora es cOption
-  // cOption con valor "7" es Anular Ticket
+  // Antes era "3" ahor cOption
   cText:=cText+cOption+CRLF
 
   // Pagos
+  aPagos:=EJECUTAR("SAMSUNG_PAGOS",cCodSuc,cTipDoc,cNumero)
+  AEVAL(aPagos,{|cLine| cText:=cText+cLine+CRLF })
+
+  // Cerrar el Documento, solo para impresoras con IGTF
+  // cOption con valor "7" es Anular Ticket
   IF cOption="3"
-
-    aPagos:=EJECUTAR("TFHKA_PAGOS",cCodSuc,cTipDoc,cNumero)
-    AEVAL(aPagos,{|cLine| cText:=cText+cLine+CRLF })
-
-    // Cerrar el Documento, solo para impresoras con IGTF
-    // IF cOption="3"
-
     cText:=cText+"199"+CRLF
-
   ENDIF
 
   DPWRITE("FACTURA.TXT",cText)

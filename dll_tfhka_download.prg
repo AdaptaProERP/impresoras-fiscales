@@ -11,7 +11,7 @@
 PROCE MAIN()
   LOCAL cDir :=oDp:cBin
   LOCAL cFile:=cDir+"tfhkaif.dll"
-  LOCAL cUrl :="http://191.96.151.60/~ftp16402/descargas/terceros/tfhkaif.dll"
+  LOCAL cUrl :=oDp:cUrlDownLoad+"/descargas/terceros/tfhkaif.dll"
 
   IF !FILE(cFile)
      URLDownLoad(cUrl,cFile)

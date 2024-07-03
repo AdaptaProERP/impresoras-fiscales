@@ -302,7 +302,13 @@ FUNCTION TFH_ERROR(nRet,lShow,lVerifPto)
   ENDIF
 
   IF nRet = 128
-    cError:="Defina la trama del campo Precio y/o cantidad"
+
+    IF "199"=oTFH:cCmd
+      cError:="No puede cerrar el ticket, posiblemente ticket anterior incompleto, resetee la impresora."
+    ELSE
+      cError:="Defina la trama del campo Precio y/o cantidad"
+    ENDIF
+
   ENDIF
 
   IF nRet = 137
