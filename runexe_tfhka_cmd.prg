@@ -69,6 +69,8 @@ PROCE MAIN(cCmd,cOption,cSerie)
 
    cMemoLog:=MemoRead(cFileLog)
 
+   oDp:cMemoLog:=cMemoLog
+
    IF (cCmd="ReadFpStatus()" .AND.  ("TRUE"$cMemoLog)) .OR. (cCmd="ReadFpStatus()" .AND. Empty(cMemoLog) .AND. FILE(cFileLog))
       RETURN .T.
    ENDIF
@@ -81,6 +83,8 @@ PROCE MAIN(cCmd,cOption,cSerie)
    FERASE(cFileLog)
 
    cFileLog:=cDir+"STATUS_TFHK_"+LSTR(SECONDS())+".TXT"
+
+   oDp:cFileLog:=cFileLog
  
    cRun:="CD\INTTFHKA "+CRLF+;
           "IntTFHKA.EXE "+cCmd+" > "+cFileLog

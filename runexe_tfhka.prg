@@ -21,7 +21,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
    LOCAL oTable
    LOCAL cWhere:="",cFile,cSql,cText:="",cSerie:=""
    LOCAL cFileOut,cMemoLog:="",lResp:=.F.,cResp
-   LOCAL cDir:="C:\IntTFHKA\",cCurDir:=CURDRIVE()+":\"+CURDIR(),cBatCall,cRun:=""
+   LOCAL cDir    :="C:\IntTFHKA\",cCurDir:=CURDRIVE()+":\"+CURDIR(),cBatCall,cRun:=""
    LOCAL cFileFav:=cDir+"FACTURA.TXT"
    LOCAL cFileLog:=cDir+"STATUS_ERROR_"+LSTR(SECONDS())+".TXT"
    LOCAL aPagos  :={},nLen,oTable,nNumero,lSave:=.T.,cTipo:=""
@@ -52,8 +52,11 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
       MsgMemo("No tiene Puerto Serial")
    ENDIF
 
+   CursorWait()
+
    IF !EJECUTAR("RUNEXE_TFHKA_STATUS",cSerie) 
-      RETURN .F.
+    // QUITAR 07/12/2023
+    //  RETURN .F.
    ENDIF
 
    cFileOut:=cCurDir+"\TEMP\"+cTipDoc+cNumero+"_OUT.LOG"
@@ -90,11 +93,18 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
 
    DPWRITE(cFile   ,cText)
    DPWRITE(cFileFav,cText)
+   DPWRITE(cDir+"FACTURA.TXT",cText) 
 
    cRun:="CD\INTTFHKA "+CRLF+;
         "IntTFHKA.EXE SendFileCmd("+cFile+") > "+cFileLog
 
    DPWRITE("RUN_TFHKA.BAT",cRun)
+
+   cRun:="CD\INTTFHKA "+CRLF+;
+        "IntTFHKA.EXE SendFileCmd(factura.txt)"
+
+   DPWRITE(cDir+"FACTURA.BAT",cRun)
+
    CURSORWAIT()
 
    ferase(cFileLog)

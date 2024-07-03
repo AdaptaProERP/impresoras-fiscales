@@ -25,7 +25,11 @@ PROCE MAIN(cSerie)
      RETURN .F.
   ENDIF
 
-  lResp:=EJECUTAR("RUNEXE_TFHKA_CMD","STATUS",NIL,cSerie)
+  oDp:cMemoLog:=""
+
+  lResp:=EJECUTAR("RUNEXE_TFHKA_CMD","STATUS","Estatus",cSerie)
+
+  ? oDp:cMemoLog
 
 RETURN lResp
 // EOF
