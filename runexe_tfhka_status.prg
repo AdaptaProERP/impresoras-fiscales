@@ -8,7 +8,7 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(cSerie)
+PROCE MAIN(cSerie,lSay)
   LOCAL cDir    :=CURDRIVE()+":"+"\"+"IntTFHKA"+"\"
   LOCAL cFileExe:=cDir+"IntTFHKA.exe"
   LOCAL cUrl    :="https://mega.nz/file/RQ9GUbhT#aWx7KTl4uo9FBNxZ2ZI_CKO5vgaLDkWlQtef9MrUaxA"
@@ -17,10 +17,12 @@ PROCE MAIN(cSerie)
      RETURN .T.
   ENDIF
 
+  DEFAULT lSay:=.T.
+
   EJECUTAR("IntTFHKA_DOWNLOAD") // 02/12/2023 descargar programa binario
 
   IF !FILE(cFileExe) 
-     MsgMemo("Necesario Programa "+cFileExe+CRLF+"Descarguelo desde "+CRLF+cUrl+CRLF+"Descomprimalo en la carpeta "+cDir,"Dirección URL Copiada en ClipBoad")
+     MsgMemo("Necesario Programa "+cFileExe+CRLF+"Descárguelo desde "+CRLF+cUrl+CRLF+"Descomprimalo en la carpeta "+cDir,"Dirección URL Copiada en ClipBoad")
      SHELLEXECUTE(oDp:oFrameDp:hWND,"open",cUrl)
      RETURN .F.
   ENDIF
@@ -29,7 +31,9 @@ PROCE MAIN(cSerie)
 
   lResp:=EJECUTAR("RUNEXE_TFHKA_CMD","STATUS","Estatus",cSerie)
 
-  ? oDp:cMemoLog
+  IF lSay
+    ? oDp:cMemoLog
+  ENDIF
 
 RETURN lResp
 // EOF

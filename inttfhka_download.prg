@@ -11,7 +11,8 @@
 PROCE MAIN()
   LOCAL cDir :="C:\IntTFHKA\"
   LOCAL cFile:=cDir+"IntTFHKA.exe"
-  LOCAL cUrl :="http://191.96.151.60/~ftp16402/descargas/terceros/IntTFHKA.exe"
+//  LOCAL cUrl :="http://191.96.151.60/~ftp16402/descargas/terceros/IntTFHKA.exe"
+  LOCAL cUrl :="https://adaptaproyectoserp.com.ve/descargas/terceros/IntTFHKA.exe"
 
   IF !FILE(cFile)
      LMKDIR(cDir)

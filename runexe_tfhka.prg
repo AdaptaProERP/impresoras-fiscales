@@ -54,7 +54,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption)
 
    CursorWait()
 
-   IF !EJECUTAR("RUNEXE_TFHKA_STATUS",cSerie) 
+   IF !EJECUTAR("RUNEXE_TFHKA_STATUS",cSerie,.F.) 
     // QUITAR 07/12/2023
     //  RETURN .F.
    ENDIF
