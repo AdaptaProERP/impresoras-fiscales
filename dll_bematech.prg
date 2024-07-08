@@ -14,7 +14,7 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
+PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
   LOCAL cFecha:=oDp:dFecha
   LOCAL cHora :=TIME()
   LOCAL oTable, oData, cSql, cWhere, lVenta
@@ -77,7 +77,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
   ENDIF
 
   oBema:hDll    :=NIL
-  oBema:cFileIni:=GetWinDir()+"\System32\BemaFI32.INI"
+// oBema:cFileIni:=GetWinDir()+"\System32\BemaFI32.INI"
+  oBema:cFileIni:="BemaFI32.INI"
   oBema:cName   :="BEMATECH"
   oBema:cFileDll:="BemaFI32.dll"
   oBema:cEstatus:=""
@@ -92,6 +93,16 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
   oBema:lImpErr :=.F.
   oBema:cTipDoc :=cTipDoc
   oBema:cNumero :=cNumero
+  oBema:oMemo   :=oMemo
+  oBema:cSql    :=""
+
+//  IF oDp:oBemaIni=NIL
+//     oDp:oBemaIni:=Tini():New( oBema:cFileIni )
+// ENDIF
+//  oBema:cMemoIni:=MemoRead(oBema:cFileIni)
+//  oBema:cPuerto:=oDp:oBemaIni:Set("Sistema","Puerta","COM2")
+// 
+//? oBema:cPuerto,oDp:oBemaIni:ClassName(),FILE(oBema:cFileIni),LEN(oBema:cMemoIni)
 
   IF !Empty(cNumero)
     oBema:cFileLog:="TEMP\"+cTipDoc+ALLTRIM(cNumero)+"_"+LSTR(SECONDS())+".LOG"
@@ -99,16 +110,15 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
     oBema:cFileLog:="TEMP\bematech_"+cCmd+".LOG"
   ENDIF
 
-
   // FUNCTION BmVerEstado(ACX ,ST1,ST2 )
   oBema:ACX     :=NIL
   oBema:ST1     :=NIL
   oBema:ST2     :=NIL
-
+/*
   IF !FILE(oBema:cFileIni)
      COPY FILE ("BemaFI32.INI") TO (oBema:cFileIni)
   ENDIF
-
+*/
   cFileLog:=oBema:cFileLog
 
   ferase(cFileLog)
@@ -151,6 +161,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
 
      IF Empty(cError) .AND. "FAV"$cCmd
        lResp:=BEMA_FAV()
+// ? lResp,"bema_FAV"
      ENDIF
 
      IF Empty(cError) .AND. "CRE"$cCmd
@@ -160,6 +171,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
      IF Empty(cError) .AND. "TOTAL"$cCmd
        lResp:=BEMA_TOTAL()
      ENDIF
+
+     oDp:uBemaResp:=lResp // respuesta bematech
 
      BEMA_END()
      BEMA_CLOSE()
@@ -189,34 +202,11 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
 
   ENDIF
 
+  nDivisa:=EJECUTAR("DPDOCCLIPAGDIV",cCodSuc,cTipDoc,cNumero)
 
-  nDivisa  :=EJECUTAR("DPDOCCLIPAGDIV",cCodSuc,cTipDoc,cNumero)
+  oTable :=EJECUTAR("DLL_BEMATECH",cCodSuc,cTipDoc,cNumero)
 
-  cSql:=" SELECT  MOV_DOCUME,DOC_FACAFE,DOC_IMPRES,MOV_CODIGO,INV_DESCRI,MOV_TOTAL,DOC_OTROS,DOC_DCTO,DOC_TIPDOC,MOV_PRECIO,MOV_DESCUE,MOV_CANTID,MOV_IVA,MOV_CODALM,"+;
-        " DOC_NUMERO,CLI_NOMBRE,CLI_RIF,CLI_DIR1,CLI_TEL1,"+;
-        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_RIF   ,DPCLIENTES.CLI_RIF   ) AS  CLI_RIF    ,"+;
-        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_NOMBRE,DPCLIENTES.CLI_NOMBRE) AS  CLI_NOMBRE ,"+;
-        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_DIR1  ,DPCLIENTES.CLI_DIR1  ) AS  CLI_DIR1   ,"+;
-        " IF(DOC_CODIGO"+GetWhere("=","0000000000")+",DPCLIENTESCERO.CCG_TEL1  ,DPCLIENTES.CLI_TEL1  ) AS  CLI_TEL1   ,"+;
-        " SFI_SERIMP,SFI_MEMO"+;
-        " FROM DPMOVINV "+;
-        " INNER JOIN DPINV ON MOV_CODIGO=INV_CODIGO "+;
-        " INNER JOIN DPDOCCLI       ON MOV_CODSUC=DOC_CODSUC AND MOV_TIPDOC=DOC_TIPDOC AND DOC_NUMERO=MOV_DOCUME AND DOC_TIPTRA='D'"+;
-        " LEFT  JOIN DPSERIEFISCAL  ON DOC_SERFIS=SFI_LETRA  "+;
-        " LEFT  JOIN DPCLIENTES     ON DOC_CODIGO=CLI_CODIGO "+;
-        " LEFT  JOIN DPCLIENTESCERO ON CCG_CODSUC=DOC_CODSUC AND CCG_TIPDOC=DOC_TIPDOC AND CCG_NUMDOC=DOC_NUMERO "+;
-        " LEFT  JOIN DPPRECIOTIP    ON MOV_LISTA=TPP_CODIGO "+;
-        " WHERE MOV_CODSUC"+GetWhere("=",cCodSuc)+;
-        " AND   MOV_TIPDOC"+GetWhere("=",cTipDoc)+;
-        " AND   MOV_DOCUME"+GetWhere("=",cNumero)+;
-        " AND   MOV_INVACT=1 "+;
-        " GROUP BY MOV_ITEM "+;
-        " ORDER BY MOV_ITEM " 
-
-  oTable:=OpenTable(cSql,.T.)
-  oBema:cSql    :=cSql
-
-  aMemo:=_VECTOR(STRTRAN(oTable:SFI_MEMO,CRLF,CHR(10)),CHR(10))
+  oBema:cSql    :=oTable:cSql
 
   // Valida si fue impreso
   IF oTable:DOC_IMPRES
@@ -232,6 +222,9 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd)
      ENDIF
 
   ENDIF
+
+  aMemo:=_VECTOR(STRTRAN(oTable:SFI_MEMO,CRLF,CHR(10)),CHR(10)) // Comentarios o Leyendas
+
   
   // 
   // cMensaje1:=oTable:SFI_COMEN1
@@ -421,13 +414,14 @@ FUNCTION BEMA_CLOSE()
   ENDIF
 
   cMemo:=""
-  AEVAL(DIRECTORY("TEMP\*.ERR"),{|a,n,cLine| cLine:=MEMOREAD("TEMP\"+a[1]),MsgMemo(cLine),cMemo:=cMemo+cLine+CRLF})
+  AEVAL(DIRECTORY("TEMP\*.ERR"),{|a,n,cLine| cLine:=MEMOREAD("TEMP\"+a[1]),IF(oBema:lShow,MsgMemo(cLine),NIL),cMemo:=cMemo+cLine+CRLF})
 
   IF !Empty(cMemo)
     oBema:oFile:AppStr(cMemo+CRLF)
   ENDIF
 
-  oBema:oFile:Close()
+  IF(ValType(oBema:oFile)="O",oBema:oFile:Close(),NIL)
+  oBema:oFile:=NIL
 
   IF oBema:lShow
 
@@ -981,6 +975,16 @@ FUNCTION BmFlagFiscal(FlagFiscal )
   oBema:FlagFiscal:=FlagFiscal
 
 RETURN uResult
+
+FUNCTION MsgErr(cMsg,oMemo)
+
+  IF ValType(oMemo)="O"
+  ELSE
+    MsgMemo(cMsg,"Bematech Mensaje")
+  ENDIF
+
+RETURN .T.
+
 
 // ADICIONALES
 

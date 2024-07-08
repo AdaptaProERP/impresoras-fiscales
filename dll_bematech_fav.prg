@@ -8,11 +8,28 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN()
-   LOCAL cNumero:=SPACE(10)
+PROCE MAIN(lSay,nLen,cSerie)
+   LOCAL cNumero:=SPACE(10),nLenC
+
+   IF Empty(oDp:cImpLetra)
+      EJECUTAR("DPSERIEFISCALLOAD")
+   ENDIF
+
+
+   DEFAULT lSay  :=.F.,;
+           nLen  :=10,;
+           cSerie:=oDp:cImpLetra
+
+   nLenC:=nLen-1
 
    EJECUTAR("DPSERIEFISCALLOAD")
-   cNumero:=EJECUTAR("DLL_BEMATECH",NIL,NIL,NIL,NIL,.T.,NIL,"FAV")
+   EJECUTAR("DLL_BEMATECH",NIL,NIL,NIL,NIL,lSay,NIL,"FAV")
+
+   cNumero:=oDp:uBemaResp
+   cNumero:=CTOO(cNumero,"C")
+   cNumero:=cSerie+REPLI("0",nLenC-LEN(cNumero))+cNumero
 
 RETURN cNumero
+// eof
+
 
