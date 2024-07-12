@@ -95,14 +95,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
   oBema:oMemo   :=oMemo
   oBema:cSql    :=""
 
-//  IF oDp:oBemaIni=NIL
-//     oDp:oBemaIni:=Tini():New( oBema:cFileIni )
-// ENDIF
-//  oBema:cMemoIni:=MemoRead(oBema:cFileIni)
-//  oBema:cPuerto:=oDp:oBemaIni:Set("Sistema","Puerta","COM2")
-// 
-//? oBema:cPuerto,oDp:oBemaIni:ClassName(),FILE(oBema:cFileIni),LEN(oBema:cMemoIni)
-
   IF !Empty(cNumero)
     oBema:cFileLog:="TEMP\"+cTipDoc+ALLTRIM(cNumero)+"_"+LSTR(SECONDS())+".LOG"
   ELSE
@@ -113,18 +105,13 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
   oBema:ACX     :=NIL
   oBema:ST1     :=NIL
   oBema:ST2     :=NIL
-/*
-  IF !FILE(oBema:cFileIni)
-     COPY FILE ("BemaFI32.INI") TO (oBema:cFileIni)
-  ENDIF
-*/
+
   cFileLog:=oBema:cFileLog
 
   ferase(cFileLog)
 
   IF FILE(cFileLog) .AND. ValType(oBema:oMemo)="O"
     oBema:MsgErr("Archivo "+cFileLog+" está abierto",oBema:oMemo)
-     // oBema:oSay:Append("Archivo "+cFileLog+" está abierto")
   ENDIF
 
   oBema:oFile:=TFile():New(oBema:cFileLog)
@@ -219,16 +206,10 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
 
   oTable :=EJECUTAR("DLL_BEMATECH_DATA",cCodSuc,cTipDoc,cNumero)
 
-  oTable:Browse()
+  IF lBrowse
+    oTable:Browse()
+  ENDIF
 
-// return .T.
-
-
-/*
-  nDivisa:=EJECUTAR("DPDOCCLIPAGDIV",cCodSuc,cTipDoc,cNumero)
-
-  oTable :=EJECUTAR("DLL_BEMATECH",cCodSuc,cTipDoc,cNumero)
-*/
   oBema:cSql    :=oTable:cSql
 
   // Valida si fue impreso
@@ -247,32 +228,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
   ENDIF
 
   aMemo:=_VECTOR(STRTRAN(oTable:SFI_MEMO,CRLF,CHR(10)),CHR(10)) // Comentarios o Leyendas
-
-  
-  // 
-  // cMensaje1:=oTable:SFI_COMEN1
-  // cMensaje2:=oTable:SFI_COMEN2
-  // cMensaje3:=oTable:SFI_COMEN3
-  // cError:=BEMA_INI()
-/*
-  IF !Empty(cError)
-
-    IF oDp:lImpFisModVal
-
-      oBema:oFile:AppStr("Error Inicializando Bematech"+CRLF)
-
-    ELSE
-
-      MensajeErr("Error Inicializando Bematech")
-      BEMA_CLOSE()
-      RETURN .F.
-
-     ENDIF
-
-  ENDIF
-*/
-  //cError:IFESTATUS()
-  //nPreTotal:= ALLTRIM(STRTRAN(TRAN(oTable:MOV_TOTAL,"999999999999.99"),".",""))
 
   IF lVenta
 
@@ -879,7 +834,7 @@ FUNCTION BMRUNFUNCION(cFunc,cName)
   DEFAULT cName:=""
 
   IF !oDp:lImpFisModVal
-    cFarProc:= GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7 ) 
+    cFarProc:= GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7,9 ) 
     uResult := CallDLL(cFarProc ) 
   ENDIF
 
