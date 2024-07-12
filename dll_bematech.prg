@@ -15,7 +15,7 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
+PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
   LOCAL cFecha:=oDp:dFecha
   LOCAL cHora :=TIME()
   LOCAL oTable, oData, cSql, cWhere, lVenta
@@ -41,7 +41,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
           oDp:lImpFisModVal:=.T.,;
           oDp:lImpFisRegAud:=.T.,;
           oDp:cImpFisCom   :="BEMATECH",;
-          cCmd             :=""
+          cCmd             :="",;
+          uValue           :=NIL
 
   IF Empty(cCmd)
 
@@ -168,7 +169,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
 
      IF !lCmdRun
         // Ejecuta funciones directa desde la DLL sin necesidad declararlas con FUNCTION en este programa
-        lResp:=BMRUNFUNCION(cCmd,cCmd)
+        lResp:=BMRUNFUNCION(cCmd,cCmd,uValue)
      ENDIF
 
      oDp:uBemaResp:=lResp // respuesta bematech
@@ -274,8 +275,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
     cPrecio  := StrTran(STR(oTable:MOV_PRECIO,12,2),".","")
     cTipDesc := "%" // %=Relativo Y $=Absoluto
     cValDesc := STRZERO(oTable:MOV_DESCUE*100,4)
-
-? cIva,"cIva"
 
     nRet:=BmVendItem( PADR(cCodigo,13), PADR(cDescr,29), PADR(cIva,05), cTipCant, cCantid, 2, cPrecio, cTipDesc, cValDesc )
 
@@ -827,15 +826,15 @@ RETURN BMRUNFUNCION("Bematech_FI_AcionaGaveta","BmAbreGav()")
 /*
 // Ejecuta funciones Bematecha, ahorra uso innecesario de funciones
 */
-FUNCTION BMRUNFUNCION(cFunc,cName)
-  LOCAL uResult :=NIL
+FUNCTION BMRUNFUNCION(cFunc,cName,uResult)
   LOCAL cFarProc:=NIL
 
-  DEFAULT cName:=""
+  DEFAULT cName   :="",;
+          uResult :=NIL
 
   IF !oDp:lImpFisModVal
     cFarProc:= GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7,9 ) 
-    uResult := CallDLL(cFarProc ) 
+    uResult := CallDLL(cFarProc,uResult) 
   ENDIF
 
   IF ValType(oBema:oFile)="O"
@@ -885,6 +884,23 @@ RETURN BMRUNFUNCION("Bematech_FI_AnulaCupon","BEMA_ANULA")
 */
 FUNCTION BEMA_X()
 RETURN BMRUNFUNCION("Bematech_FI_LecturaX","BEMA_X")
+
+FUNCTION BEMA_ALICUOTAS()
+  LOCAL uResult:=SPACE(60), cFarProc
+  LOCAL cFunc  :="Bematech_FI_RetornoAlicuotas"  
+
+  IF !oDp:lImpFisModVal
+    cFarProc:=GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7,9) 
+    uResult :=CallDLL(cFarProc,uResult)
+  ENDIF
+
+  IF ValType(oBema:oFile)="O"
+    oBema:oFile:AppStr("BEMA_ALICUOTAS(),"+cFunc+"(),Result->"+CTOO(uResult,"C")+CRLF)
+  ENDIF
+
+  SysRefresh(.T.)
+
+RETURN uResult
 
 
 /*

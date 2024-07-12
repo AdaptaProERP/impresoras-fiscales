@@ -8,13 +8,14 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(cCmd,cOption,lShow,lShow,lBrowse)
+PROCE MAIN(cCmd,cOption,uValue,lShow,lMsgErr,lBrowse)
    LOCAL cResp:=NIL,oTable,nNumero,cMemoLog:="",cTipo:=""
-   LOCAL lRunCmd:=.F.
+   LOCAL lRunCmd:=.F.,oMemo
 
    DEFAULT cCmd   :="Z",;
            cOption:="Reporte Z",;
            lShow  :=.F.,;
+           uValue :=NIL,;
            lMsgErr:=.T.,;
            lBrowse:=.F.
 
