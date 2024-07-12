@@ -1,4 +1,4 @@
-// Programa   : DLL_BEMATECH_Z
+// Programa   : DLL_BEMATECH_X
 // Fecha/Hora : 24/06/2024 12:54:03
 // Propósito  : Emitir reporte Z
 // Creado Por :
@@ -11,6 +11,7 @@
 PROCE MAIN()
 
    EJECUTAR("DPSERIEFISCALLOAD")
-   EJECUTAR("DLL_BEMATECH",NIL,NIL,NIL,NIL,.T.,NIL,"Z")
+   EJECUTAR("DLL_BEMATECH",NIL,NIL,NIL,NIL,.T.,NIL,"X")
 RETURN .T.
 // EOF
+

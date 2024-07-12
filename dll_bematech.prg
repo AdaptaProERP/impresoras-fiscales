@@ -1,10 +1,11 @@
 // Programa   : DLL_BEMATECH
-// Fecha/Hora : 10/02/2023
+// Fecha/Hora : 10/07/2024
 // Propósito  : Impresora BEMATECH
-// Creado Por : Kelvis Escalante/Juan Navas
+// Creado Por : Juan Navas
 // Llamado por: DLL_IMPFISCAL       
 // Aplicación : Facturación
 // Tabla      : DPDOCCLI/DPMOVINV
+// Referencia de funciones: https://fivetechsupport.com/forums/viewtopic.php?f=6&t=23641&start=0#p127076
 // Alicuota = 16.00 G
 // Alicuota =  8.00 R 
 // Alicuota = 00.00 E
@@ -29,7 +30,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
   LOCAL cVALOR:="" // MYSQLGET("DPHISMON","HMN_VALOR","HMN_CODIGO"+GetWhere("=","USD")+"  ORDER BY CONCAT(HMN_FECHA,HMN_HORA) DESC LIMIT 1")
   // LOCAL cCodBema:='11.111.111-11'
   LOCAL oBema, cBema,cFileLog,aMemo:={},aPagos:={},I
-  LOCAL nDivisa:=0,lResp
+  LOCAL nDivisa:=0,lResp,lCmdRun:=.F.
   //LOCAL error:=.F.
 
   PRIVATE aTipoPago:={}
@@ -53,10 +54,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
             "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
             "DOC_TIPTRA"+GetWhere("=","D"    )
 
-
   ELSE
-
-      
+    
      cCodSuc:=""
      cTipDoc:=""
      cNumero:=""
@@ -157,19 +156,32 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
 
      IF Empty(cError) .AND. "Z"$cCmd
        lResp:=BEMA_ZETA()
+       lCmdRun:=.T.
+     ENDIF
+
+     IF Empty(cError) .AND. "X"$cCmd
+       lResp:=BEMA_X()
+       lCmdRun:=.T.
      ENDIF
 
      IF Empty(cError) .AND. "FAV"$cCmd
        lResp:=BEMA_FAV()
-// ? lResp,"bema_FAV"
+       lCmdRun:=.T.
      ENDIF
 
      IF Empty(cError) .AND. "CRE"$cCmd
        lResp:=BEMA_CRE()
+       lCmdRun:=.T.
      ENDIF
 
      IF Empty(cError) .AND. "TOTAL"$cCmd
        lResp:=BEMA_TOTAL()
+       lCmdRun:=.T.
+     ENDIF
+
+     IF !lCmdRun
+        // Ejecuta funciones directa desde la DLL sin necesidad declararlas con FUNCTION en este programa
+        lResp:=BMRUNFUNCION(cCmd,cCmd)
      ENDIF
 
      oDp:uBemaResp:=lResp // respuesta bematech
@@ -202,10 +214,21 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
 
   ENDIF
 
+
+  nDivisa:=EJECUTAR("DPDOCCLIPAGDIV",cCodSuc,cTipDoc,cNumero)
+
+  oTable :=EJECUTAR("DLL_BEMATECH_DATA",cCodSuc,cTipDoc,cNumero)
+
+  oTable:Browse()
+
+// return .T.
+
+
+/*
   nDivisa:=EJECUTAR("DPDOCCLIPAGDIV",cCodSuc,cTipDoc,cNumero)
 
   oTable :=EJECUTAR("DLL_BEMATECH",cCodSuc,cTipDoc,cNumero)
-
+*/
   oBema:cSql    :=oTable:cSql
 
   // Valida si fue impreso
@@ -289,13 +312,15 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo)
 
     cCodigo  := oTable:MOV_CODIGO
     cDescr   := oTable:INV_DESCRI  
-    cAlicuota:= AllTRIM(STR(oTable:MOV_IVA,6,2))
-    cIva     := StrTran(cAlicuota,".","")
+    cAlicuota:= LSTR(oTable:MOV_IVA,6,2)
+    cIva     := STRTRAN(cAlicuota,".","")
     cTipCant := "F"
     cCantid  := StrTran(STR(oTable:MOV_CANTID,7,3),".","")
     cPrecio  := StrTran(STR(oTable:MOV_PRECIO,12,2),".","")
     cTipDesc := "%" // %=Relativo Y $=Absoluto
     cValDesc := STRZERO(oTable:MOV_DESCUE*100,4)
+
+? cIva,"cIva"
 
     nRet:=BmVendItem( PADR(cCodigo,13), PADR(cDescr,29), PADR(cIva,05), cTipCant, cCantid, 2, cPrecio, cTipDesc, cValDesc )
 
@@ -516,8 +541,8 @@ FUNCTION BmVendItem( Codigo,Descricao,Aliquota,TpQte,Quantid,Decimal,ValUnit,TpD
   LOCAL uResult := 0
 
   IF !oDp:lImpFisModVal
-     cFarProc:= GetProcAdd( oDp:nBemaDLL, If( Empty( "Bematech_FI_VendeArticulo" ) == .T., "BmVendItem", "Bematech_FI_VendeArticulo" ), .T., 7,8,8,8,8,8,7,8,8,8 )
-     uResult := FWCallDLL( cFarProc,Codigo,Descricao,Aliquota,TpQte,Quantid,Decimal,ValUnit,TpDesc,ValDesc )
+     cFarProc:= GetProcAddress( oDp:nBemaDLL, If( Empty( "Bematech_FI_VendeArticulo" ) == .T., "BmVendItem", "Bematech_FI_VendeArticulo" ), .T., 7,8,8,8,8,8,7,8,8,8 )
+     uResult := CallDLL( cFarProc,Codigo,Descricao,Aliquota,TpQte,Quantid,Decimal,ValUnit,TpDesc,ValDesc )
   ENDIF
 
   oBema:oFile:AppStr("BmVendItem( Codigo,Descricao,Aliquota,TpQte,Quantid,Decimal,ValUnit,TpDesc,ValDesc )"+CRLF+;
@@ -590,7 +615,7 @@ FUNCTION BmTerFecCup( Mensagem )
   LOCAL cFunc   :="Bematech_FI_FinalizarCierreCupon"
 
   IF !oDp:lImpFisModVal
-     cFarProc:= GetProcAddress( oDp:nBemaDLL,Func, .T., 7,8 )
+     cFarProc:= GetProcAddress( oDp:nBemaDLL,cFunc, .T., 7,8 )
      uResult := CallDLL( cFarProc,Mensagem )
   ENDIF
 
@@ -717,7 +742,7 @@ FUNCTION BEMA_ERROR(nRet,lShow)
 
  ELSE
 
-    cError:=EJECUTAR("DLL_BEMATECH_CHECK")
+    cError:=BEMATECH_CHECK() // EJECUTAR("DLL_BEMATECH_CHECK")
 
  ENDIF
  
@@ -864,6 +889,9 @@ FUNCTION BMRUNFUNCION(cFunc,cName)
 
 RETURN uResult
 
+/*
+// Reporte Zeta
+*/
 FUNCTION BEMA_ZETA(dT,Hs)
    LOCAL uResult:=NIL, cFarProc
    LOCAL cFunc  :="Bematech_FI_ReducaoZ"  // BemaReporteZeta    
@@ -884,6 +912,25 @@ FUNCTION BEMA_ZETA(dT,Hs)
   SysRefresh(.T.)
 
 RETURN uResult
+
+/*
+// Resetear Impresora
+*/
+FUNCTION BEMA_RESET()
+RETURN BMRUNFUNCION("Bematech_FI_ResetaImpresora","BEMA_RESET")
+
+/*
+// Anular Cupon
+*/
+FUNCTION BEMA_ANULA()
+RETURN BMRUNFUNCION("Bematech_FI_AnulaCupon","BEMA_ANULA")
+
+/*
+// Reporte X
+*/
+FUNCTION BEMA_X()
+RETURN BMRUNFUNCION("Bematech_FI_LecturaX","BEMA_X")
+
 
 /*
 // Devuele Ultimo número de Factura
@@ -985,31 +1032,302 @@ FUNCTION MsgErr(cMsg,oMemo)
 
 RETURN .T.
 
+FUNCTION BEMATECH_CHECK()
+  LOCAL cError:="",nRet,lVerCup:=.T.,lShow:=.T.
+  LOCAL iACK,iST1,iST2
 
-// ADICIONALES
+  WHILE .T.
 
-//IF PADR(TIK_IVA,5) = "0.00" AND TIK_CONTRI ="S"
-//cAlicuota = "II"
-//ENDIF 
-   
-//////////////////////////////////////////    
-// Entero o "F" fraccionado
-// Siempre va a ser una "F"
-//cTipCant:=IIF(nCant=INT(nCant),"I","F")
-//IF cTipCant="F"
-//   cCantid :=STR(nCant,7,3)
-//ELSE
-//   cCantid :=STR(nCant,4,0)
-//ENDIF
-//cCantid :=StrTran(cCantid,".","")
-///////////////////////////////////////////
+    iACK := 0
+    iST1 := 0
+    iST2 := 0
+    nRet := BmVerEstado( @iACK, @iST1, @iST2 )
 
-//////////////////////////////////////////////////////////
-//IF cTipDesc="%"
-//   cValDesc:=STRZERO(nDesc*100,4) // STR(nDesc*100,4,0)
-//ELSE
-//   cValDesc:=STRZERO(nDesc*100,8)
-//ENDIF
-//////////////////////////////////////////////////////////
-// EOF
-//
+    iACK:=oBema:ACX
+    iST1:=oBema:ST1
+    iST2:=oBema:ST2
+
+    IF iACK = 21
+      MensajeErr("La impresora ha retornado NAK !", [Atención] )
+    ELSE
+
+    IF ( iST1 <> 0 ) .OR. ( iST2 <> 0 )
+
+        cError:=""
+        // Analiza ST1
+
+        IF ( iST1 >= 128 )
+           iST1 := iST1 - 128
+           cError := cError+ "Fin de Papel" + chr(13)
+        ENDIF
+
+        IF ( iST1 >= 64 )
+            iST1 := iST1 - 64
+            cError := cError+ "Poco Papel" + chr(13)
+        ENDIF
+
+        IF ( iST1 >= 32 )
+            iST1 := iST1 - 32
+            cError := cError+ "Error en el Reloj" + chr(13)
+        ENDIF
+
+        IF ( iST1 >= 16 )
+          iST1 := iST1 - 16
+          cError := cError+ 'Impresora con error' + chr(13)
+        ENDIF
+
+        IF ( iST1 >= 8 )
+          iST1 :=  iST1 - 8
+          cError := cError+ "Primer dato del comando no fue ESC" + chr(13)
+        ENDIF
+
+        IF iST1 >= 4
+          iST1 :=  iST1 - 4
+          cError := cError+ "Comando inexistente" + chr(13)
+        ENDIF
+
+       if iST1 >= 2
+          iST1 :=  iST1 - 2
+          if lVerCup
+             cError := cError+ "Cupón fiscal abierto" + chr(13)
+          ENDIF
+       ENDIF
+
+       IF iST1 >= 1
+          iST1 :=  iST1 - 1
+          cError := cError+ "Número de parámetros inválidos" + chr(13)
+       ENDIF
+
+       //  Analisa ST2
+       IF iST2 >= 128
+          iST2 :=  iST2 - 128
+          cError := cError+ "Tipo de parámetro de comando inválido" + chr(13)
+       ENDIF
+
+       IF iST2 >= 64
+          iST2 :=  iST2 - 64
+          cError := cError+ "Memória fiscal llena" + chr(13)
+       ENDIF
+
+       IF iST2 >= 32
+          iST2 :=  iST2 - 32
+          cError := cError+ "Error en la CMOS" + chr(13)
+       ENDIF
+
+       IF iST2 >= 16
+          iST2 :=  iST2 - 16
+          cError := cError+ "Alicuota no programada" + chr(13)
+       ENDIF
+
+       IF iST2 >= 8
+          iST2 :=  iST2 - 8
+          cError := cError+ "Capacidad de Alicuota Programables llena" + chr(13)
+       ENDIF
+
+       IF iST2 >= 4
+          iST2 :=  iST2 - 4
+          cError := cError+ "Cancelamiento no permitido" + chr(13)
+       ENDIF
+
+       IF iST2 >= 2
+          iST2 :=  iST2 - 2
+          cError := cError+ "RIF del propietario no Programados" + chr(13)
+       ENDIF
+
+       IF iST2 >= 1
+          iST2 :=  iST2 - 1
+          cError := cError+ "Comando no ejecutado" + chr(13)
+       ENDIF
+
+       //Alert (cError, "Atención" )
+
+       IF !EMPTY(cError)
+          cError:="Error:"+LSTR(nRet)+", "+cError
+          IF lShow
+             MensajeErr(cError,"Error Impresora Bematech.")
+           ENDIF
+       ENDIF
+
+     ENDIF
+
+       // Return (cError)
+    ENDIF
+
+     IF EMPTY(cError) .OR.  !("Fin de Papel" $ cError .OR. "Poco Papel" $ cError)
+        EXIT
+     ENDIF
+
+  ENDDO
+
+  //??"endif cError", cError
+
+  IF !EMPTY(cError)
+     cError:="Error:"+LSTR(nRet)+", "+cError
+     IF lShow
+       MensajeErr(cError,"Error Impresora Bematech")
+     ENDIF
+  ENDIF
+
+RETURN cError
+
+FUNCTION BmVerEstado(ACX ,ST1,ST2 ) 
+   LOCAL hDLL   :=oDp:nBemaDLL
+   LOCAL uResult:=NIL 
+   LOCAL cFunc  :="Bematech_FI_VerificaEstadoImpresora"
+   LOCAL cFarProc 
+
+   oBema:ACX:=ACX
+   oBema:ST1:=ST1
+   oBema:ST2:=ST2
+
+   IF !oDp:lImpFisModVal
+     cFarProc:= GetProcAddress(hDLL,cFunc,.T.,7,10 ,10,10 )
+     uResult := CallDLL(cFarProc,@ACX ,@ST1,@ST2 )
+
+     oBema:ACX:=ACX
+     oBema:ST1:=ST1
+     oBema:ST2:=ST2
+   ENDIF
+
+   oBema:oFile:AppStr("BmVerEstado(ACX->"+CTOO(ACX,"C")+;
+                                        ",ST1->"+CTOO(ST1,"C")+;
+                                        ",ST2->"+CTOO(ST2,"C")+")nResult="+CTOO(uResult,"C")+CRLF)
+RETURN uResult
+
+
+/*
+// LISTADO  DE FUNCIONES 
+DLL function Bematech_FI_AbreComprobanteDeVenta(RIF AS STRING, Nombre AS STRING ) AS LONG PASCAL FROM "Bematech_FI_AbreComprobanteDeVenta" LIB "BemaFI32.dll"
+DLL FUNCTION Bematech_FI_VendeArticulo(CODIGO AS STRING, DESCRIPCION AS STRING, ALICUOTA AS STRING, TIPOCANTIDAD AS STRING, CANTIDAD AS STRING, CASASDECIMALES AS LONG, VALORUNITARIO AS STRING, TIPODESCUENTO AS STRING, DESCUENTO AS STRING) AS LONG PASCAL FROM "Bematech_FI_VendeArticulo" LIB "BemaFI32.dll"
+DLL function Bematech_FI_AbreComprobanteDeVentaEx(RIF AS String, Nombre AS String, Direccion AS String) AS LONG PASCAL FROM "Bematech_FI_AbreComprobanteDeVentaEx" LIB "BemaFI32.dll"
+DLL function Bematech_FI_DevolucionArticulo(cCodigo AS String, cDescripcion AS String, cAlicuota AS String, cTipoCantidad AS String, cCantidad AS String, iCasasDecimales AS Integer, cValorUnit AS String, cTipoDescuento AS String, cValorDesc AS String) AS LONG PASCAL FROM "Bematech_FI_DevolucionArticulo" LIB "BemaFI32.dll"
+DLL function Bematech_FI_AbreNotaDeCredito(cNombre AS String, cNumeroSerie AS String, cRIF AS String, cDia AS String ,cMes AS String, cAno AS String, cHora AS String, cMinuto AS String, cSecundo AS String, cCOO AS String) AS LONG PASCAL FROM "Bematech_FI_AbreNotaDeCredito" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VendeArticuloDepartamento( Codigo AS String , Descripcion AS String , Alicuota AS String, ValorUnitario AS String , Cantidad AS String , Incremento AS String , Descuento AS String , IndiceDepartamento AS String , UnidadMedida AS String ) AS LONG PASCAL FROM "Bematech_FI_VendeArticuloDepartamento" LIB "BemaFI32.dll"
+DLL function Bematech_FI_AnulaArticuloAnterior() AS LONG PASCAL FROM "Bematech_FI_AnulaArticuloAnterior" LIB "BemaFI32.dll"
+DLL function Bematech_FI_AnulaArticuloGenerico( NumeroItem AS String ) AS LONG PASCAL FROM "Bematech_FI_AnulaArticuloGenerico" LIB "BemaFI32.dll"
+DLL function Bematech_FI_AnulaCupon() AS LONG PASCAL FROM "Bematech_FI_AnulaCupon" LIB "BemaFI32.dll"
+DLL function Bm_FI_CierraCuponReducido( FormaPago AS LPSTR , Mensaje AS LPSTR ) AS LONG PASCAL FROM "Bematech_FI_CierraCuponReducido" LIB "BemaFI32.dll"
+DLL function Bematech_FI_CierraCupon( FormaPago AS String , IncrementoDescuento AS String , TipoIncrementoDescuento AS String , ValorIncrementoDescuento AS String , ValorPago AS String , Mensaje AS String ) AS LONG PASCAL FROM "Bematech_FI_CierraCupon" LIB "BemaFI32.dll"
+DLL FUNCTION BmFechaCup( FormaPgto AS STRING, Acrescimo AS STRING, TipoAcresc AS STRING, ValorAcresc AS STRING, ValorPago AS STRING, Mensagem AS STRING ) AS LONG PASCAL FROM "Bematech_FI_CierraCupon" LIB "BemaFI32"
+DLL FUNCTION BemaReporteZeta( Dt AS LPSTR, Hs AS LPSTR ) AS LONG PASCAL FROM "Bematech_FI_ReduccionZ" LIB "BemaFI32"
+DLL FUNCTION BemaProgAlicuota( cTasas AS LPSTR) AS LONG PASCAL FROM "Bematech_FI_ProgramaAlicuota" LIB "BemaFI32"
+DLL function Bematech_FI_ResetaImpresora() AS LONG PASCAL FROM "Bematech_FI_ResetaImpresora" LIB "BemaFI32.dll"
+DLL function Bematech_FI_IniciaCierreCupon( IncrementoDescuento AS String , TipoincrementoDescuento AS String , ValorIncrementoDescuento AS String ) AS LONG PASCAL FROM "Bematech_FI_IniciaCierreCupon" LIB "BemaFI32.dll"
+DLL function Bematech_FI_EfectuaFormaPago( FormaPago AS String , ValorFormaPago AS String ) AS LONG PASCAL FROM "Bematech_FI_EfectuaFormaPago" LIB "BemaFI32.dll"
+DLL function Bematech_FI_EfectuaFormaPagoDescripcionForma( FormaPago AS string , ValorFormaPago AS string , DescripcionFormaPago AS string ) AS LONG PASCAL FROM "Bematech_FI_EfectuaFormaPagoDescripcionForma" LIB "BemaFI32.dll"
+DLL function Bematech_FI_FinalizarCierreCupon( Mensaje AS String ) AS LONG PASCAL FROM "Bematech_FI_FinalizarCierreCupon" LIB "BemaFI32.dll"
+DLL function Bematech_FI_RectificaFormasPago( FormaOrigen AS String , FormaDestino AS String , Valor AS String ) AS LONG PASCAL FROM "Bematech_FI_RectificaFormasPago" LIB "BemaFI32.dll"
+DLL function Bematech_FI_UsaUnidadMedida( UnidadMedida AS String ) AS LONG PASCAL FROM "Bematech_FI_UsaUnidadMedida" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ExtenderDescripcionArticulo( Descripcion AS String ) AS LONG PASCAL FROM "Bematech_FI_ExtenderDescripcionArticulo" LIB "BemaFI32.dll"
+// Funciones de Inicialización
+DLL function Bematech_FI_CambiaSimboloMoneda( SimboloMoneda AS String ) AS LONG PASCAL FROM "Bematech_FI_CambiaSimboloMoneda" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ProgramaAlicuot( Aliquota AS String , ICMS_ISS AS Integer ) AS LONG PASCAL FROM "Bematech_FI_ProgramaAlicuota" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ProgramaHorarioDeVerano() AS LONG PASCAL FROM "Bematech_FI_ProgramaHorarioDeVerano" LIB "BemaFI32.dll"
+DLL function Bematech_FI_CrearDepartamento( Indice AS Integer, Departamento AS String ) AS LONG PASCAL FROM "Bematech_FI_CrearDepartamento" LIB "BemaFI32.dll"
+DLL function Bematech_FI_CrearTotalizadorSinIcms( Indice AS Integer, Totalizador AS String ) AS LONG PASCAL FROM "Bematech_FI_CrearTotalizadorSinIcms" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ProgramaRedondeo() AS LONG PASCAL FROM "Bematech_FI_ProgramaRedondeo" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ProgramaTruncamiento() AS LONG PASCAL FROM "Bematech_FI_ProgramaTruncamiento" LIB "BemaFI32.dll"
+DLL function Bematech_FI_LineasEntreCupones( Linhas AS Integer ) AS LONG PASCAL FROM "Bematech_FI_LineasEntreCupones" LIB "BemaFI32.dll"
+DLL function Bematech_FI_EspacioEntreLineas( Dots AS Integer ) AS LONG PASCAL FROM "Bematech_FI_EspacioEntreLineas" LIB "BemaFI32.dll"
+DLL function Bematech_FI_FuerzaImpactoAgujas( FuerzaImpacto AS Integer ) AS LONG PASCAL FROM "Bematech_FI_FuerzaImpactoAgujas" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ActivaDesactivaReporteZAutomatico(flag AS Integer ) AS LONG PASCAL FROM "Bematech_FI_ActivaDesactivaReporteZAutomatico" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ActivaDesactivaCuponAdicional(flag AS Integer ) AS LONG PASCAL FROM "Bematech_FI_ActivaDesactivaCuponAdicional" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ActivaDesactivaVinculadoComprobanteNoFiscal(flag AS Integer ) AS LONG PASCAL FROM "Bematech_FI_ActivaDesactivaVinculadoComprobanteNoFiscal" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ActivaDesactivaImpresionBitmapMA( flag AS Integer ) AS LONG PASCAL FROM "Bematech_FI_ActivaDesactivaImpresionBitmapMA" LIB "BemaFI32.dll"
+DLL function Bematech_FI_HoraLimiteReporteZ( Hora AS string ) AS LONG PASCAL FROM "Bematech_FI_HoraLimiteReporteZ" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ProgramaCliche( Cliche AS String ) AS LONG PASCAL FROM "Bematech_FI_ProgramaCliche" LIB "BemaFI32.dll"
+// Funciones de los Informes Fiscales
+DLL function Bematech_FI_LecturaX() AS LONG PASCAL FROM "Bematech_FI_LecturaX" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ReduccionZ( Fecha as String , Hora as String ) AS LONG PASCAL FROM "Bematech_FI_ReduccionZ" LIB "BemaFI32.dll"
+DLL function Bematech_FI_InformeGerencial( Texto as String ) AS LONG PASCAL FROM "Bematech_FI_InformeGerencial" LIB "BemaFI32.dll"
+DLL function Bematech_FI_InformeGerencialTEF( Texto as String ) AS LONG PASCAL FROM "Bematech_FI_InformeGerencialTEF" LIB "BemaFI32.dll"
+DLL function Bematech_FI_CierraInformeGerencial() AS LONG PASCAL FROM "Bematech_FI_CierraInformeGerencial" LIB "BemaFI32.dll"
+DLL function Bematech_FI_LecturaMemoriaFiscalFecha( FechaInicial as String , FechaFinal as String ) AS LONG PASCAL FROM "Bematech_FI_LecturaMemoriaFiscalFecha" LIB "BemaFI32.dll"
+DLL function Bematech_FI_LecturaMemoriaFiscalReduccion( ReduccionInicial as String, ReduccionFinal as String ) AS LONG PASCAL FROM "Bematech_FI_LecturaMemoriaFiscalReduccion" LIB "BemaFI32.dll"
+DLL function Bematech_FI_LecturaMemoriaFiscalSerialFecha( FechaInicial as String , FechaFinal as String ) AS LONG PASCAL FROM "Bematech_FI_LecturaMemoriaFiscalSerialFecha" LIB "BemaFI32.dll"
+DLL function Bematech_FI_LecturaMemoriaFiscalSerialReduccion( ReduccionInicial as String , ReduccionFinal as String ) AS LONG PASCAL FROM "Bematech_FI_LecturaMemoriaFiscalSerialReduccion" LIB "BemaFI32.dll"
+DLL function Bematech_FI_InformeTransacciones( tipo as String, Fechaini as String, Fechafim as String, Opcion as String ) AS LONG PASCAL FROM "Bematech_FI_InformeTransacciones" LIB "BemaFI32.dll"
+// Funciones de las Operaciones No Fiscales
+DLL function Bematech_FI_RecibimientoNoFiscal( IndiceTotalizador as String , Valor as String , FormaPago as String ) AS LONG PASCAL FROM "Bematech_FI_RecibimientoNoFiscal" LIB "BemaFI32.dll"
+DLL function Bematech_FI_AbreComprobanteNoFiscalVinculado( FormaPago as String , Valor as String , NumeroCupon as String ) AS LONG PASCAL FROM "Bematech_FI_AbreComprobanteNoFiscalVinculado" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ImprimeComprobanteNoFiscalVinculado( Texto as String ) AS LONG PASCAL FROM "Bematech_FI_ImprimeComprobanteNoFiscalVinculado" LIB "BemaFI32.dll"
+DLL function Bematech_FI_UsaComprobanteNoFiscalVinculadoTEF( Texto as String ) AS LONG PASCAL FROM "Bematech_FI_UsaComprobanteNoFiscalVinculadoTEF" LIB "BemaFI32.dll"
+DLL function Bematech_FI_CierraComprobanteNoFiscalVinculado() AS LONG PASCAL FROM "Bematech_FI_CierraComprobanteNoFiscalVinculado" LIB "BemaFI32.dll"
+DLL function Bematech_FI_Sangria( Valor as String ) AS LONG PASCAL FROM "Bematech_FI_Sangria" LIB "BemaFI32.dll"
+DLL function Bematech_FI_Provision( Valor as String , FormaPago as String ) AS LONG PASCAL FROM "Bematech_FI_Provision" LIB "BemaFI32.dll"
+DLL function Bematech_FI_AbreInformeGerencial( NumInforme as string ) AS LONG PASCAL FROM "Bematech_FI_AbreInformeGerencial" LIB "BemaFI32.dll"
+// Otras Funciones
+DLL function Bematech_FI_AbrePuertaSerial() AS LONG PASCAL FROM 'Bematech_FI_AbrePuertaSerial' LIB "BemaFI32.dll"
+DLL function Bematech_FI_CierraPuertaSerial() AS LONG PASCAL FROM 'Bematech_FI_CierraPuertaSerial' LIB "BemaFI32.dll"
+DLL function Bematech_FI_AperturaDelDia( ValorCompra AS string , FormaPago AS string ) AS LONG PASCAL FROM 'Bematech_FI_AperturaDelDia' LIB "BemaFI32.dll"
+DLL function Bematech_FI_CierreDelDia() AS LONG PASCAL FROM 'Bematech_FI_CierreDelDia' LIB "BemaFI32.dll"
+DLL function Bematech_FI_ImprimeConfiguracionesImpresora() AS LONG PASCAL FROM 'Bematech_FI_ImprimeConfiguracionesImpresora' LIB "BemaFI32.dll"
+DLL function Bematech_FI_ImprimeDepartamentos() AS LONG PASCAL FROM 'Bematech_FI_ImprimeDepartamentos' LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaImpresoraPrendida() AS LONG PASCAL FROM 'Bematech_FI_VerificaImpresoraPrendida' LIB "BemaFI32.dll"
+DLL function Bematech_FI_ImpresionCarne( Titulo as String, Parcelas AS string , Fechas AS integer, Cantidad AS integer, Texto AS string, Cliente AS string, RG_CPF AS string, Cupon AS string , Vias AS integer, Firma AS integer ) AS LONG PASCAL FROM 'Bematech_FI_ImpresionCarne' LIB "BemaFI32.dll"
+DLL function Bematech_FI_InfoBalanza( Porta AS string , Modelo AS integer, Peso as String, PrecioKilo as String, Total AS string ) AS LONG PASCAL FROM 'Bematech_FI_InfoBalanza' LIB "BemaFI32.dll"
+DLL function Bematech_FI_VersionDll( Version AS String ) AS LONG PASCAL FROM 'Bematech_FI_VersionDll' LIB "BemaFI32.dll"
+DLL function Bematech_FI_LeerArchivoRetorno( Retorno AS String ) AS LONG PASCAL FROM 'Bematech_FI_LeerArchivoRetorno' LIB "BemaFI32.dll"
+DLL function Bematech_FI_ReloadINIFile() AS LONG PASCAL FROM 'Bematech_FI_ReloadINIFile' LIB "BemaFI32.dll"
+// Funciones de Autenticación y Gaveta de Efectivo
+DLL function Bematech_FI_Autenticacion() AS LONG PASCAL FROM "Bematech_FI_Autenticacion" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ProgramaCaracterAutenticacion( Parametros AS String ) AS LONG PASCAL FROM "Bematech_FI_ProgramaCaracterAutenticacion" LIB "BemaFI32.dll"
+DLL function Bematech_FI_AccionaGaveta() AS LONG PASCAL FROM "Bematech_FI_AccionaGaveta" LIB "BemaFI32.dll"
+// Funciones de Informaciones de la Impresora
+DLL function Bematech_FI_NumeroSerie( NumeroSerie AS String ) AS LONG PASCAL FROM "Bematech_FI_NumeroSerie" LIB "BemaFI32.dll"
+DLL function Bematech_FI_SubTotal( SubTotal AS String ) AS LONG PASCAL FROM "Bematech_FI_SubTotal" LIB "BemaFI32.dll"
+DLL function Bematech_FI_NumeroCupon( NumeroCupon AS String ) AS LONG PASCAL FROM "Bematech_FI_NumeroCupon" LIB "BemaFI32.dll"
+DLL function Bematech_FI_LecturaXSerial() AS LONG PASCAL FROM "Bematech_FI_LecturaXSerial" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VersionFirmware( VersionFirmware AS String ) AS LONG PASCAL FROM "Bematech_FI_VersionFirmware" LIB "BemaFI32.dll"
+DLL function Bematech_FI_CGC_IE( CGC AS String , IE AS String ) AS LONG PASCAL FROM "Bematech_FI_CGC_IE" LIB "BemaFI32.dll"
+DLL function Bematech_FI_GranTotal( GranTotal AS String ) AS LONG PASCAL FROM "Bematech_FI_GranTotal" LIB "BemaFI32.dll"
+DLL function Bematech_FI_Cancelamientos( ValorCancelamientos AS String ) AS LONG PASCAL FROM "Bematech_FI_Cancelamientos" LIB "BemaFI32.dll"
+DLL function Bematech_FI_Descuentos( ValorDescuentos AS String ) AS LONG PASCAL FROM "Bematech_FI_Descuentos" LIB "BemaFI32.dll"
+DLL function Bematech_FI_NumeroOperacionesNoFiscales( NumeroOperaciones AS String ) AS LONG PASCAL FROM "Bematech_FI_NumeroOperacionesNoFiscales" LIB "BemaFI32.dll"
+DLL function Bematech_FI_NumeroCuponesAnulados( NumeroCancelamientos AS String ) AS LONG PASCAL FROM "Bematech_FI_NumeroCuponesAnulados" LIB "BemaFI32.dll"
+DLL function Bematech_FI_NumeroIntervenciones( NumeroIntervenciones AS String ) AS LONG PASCAL FROM "Bematech_FI_NumeroIntervenciones" LIB "BemaFI32.dll"
+DLL function Bematech_FI_NumeroReducciones( NumeroReducoes AS String ) AS LONG PASCAL FROM "Bematech_FI_NumeroReducciones" LIB "BemaFI32.dll"
+DLL function Bematech_FI_NumeroSustitucionesPropietario( NumeroSustituiciones AS String ) AS LONG PASCAL FROM "Bematech_FI_NumeroSustitucionesPropietario" LIB "BemaFI32.dll"
+DLL function Bematech_FI_UltimoArticuloVendido( NumeroArticulo AS String ) AS LONG PASCAL FROM "Bematech_FI_UltimoArticuloVendido" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ClichePropietario( Cliche AS String ) AS LONG PASCAL FROM "Bematech_FI_ClichePropietario" LIB "BemaFI32.dll"
+DLL function Bematech_FI_NumeroCaja( NumeroCaja AS String ) AS LONG PASCAL FROM "Bematech_FI_NumeroCaja" LIB "BemaFI32.dll"
+DLL function Bematech_FI_NumeroTienda( NumeroTienda AS String ) AS LONG PASCAL FROM "Bematech_FI_NumeroTienda" LIB "BemaFI32.dll"
+DLL function Bematech_FI_SimboloMoneda( SimboloMoneda AS String ) AS LONG PASCAL FROM "Bematech_FI_SimboloMoneda" LIB "BemaFI32.dll"
+DLL function Bematech_FI_MinutosPrendida( Minutos AS String ) AS LONG PASCAL FROM "Bematech_FI_MinutosPrendida" LIB "BemaFI32.dll"
+DLL function Bematech_FI_MinutosImprimiendo( Minutos AS String ) AS LONG PASCAL FROM "Bematech_FI_MinutosImprimiendo" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaModoOperacion( Modo AS string ) AS LONG PASCAL FROM "Bematech_FI_VerificaModoOperacion" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaEpromConectada( Flag AS String ) AS LONG PASCAL FROM "Bematech_FI_VerificaEpromConectada" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ValorPagoUltimoCupon( ValorCupon AS String ) AS LONG PASCAL FROM "Bematech_FI_ValorPagoUltimoCupon" LIB "BemaFI32.dll"
+DLL function Bematech_FI_FechaHoraImpresora( Fecha AS String , Hora AS String ) AS LONG PASCAL FROM "Bematech_FI_FechaHoraImpresora" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ContadoresTotalizadoresNoFiscales( Contadores AS String ) AS LONG PASCAL FROM "Bematech_FI_ContadoresTotalizadoresNoFiscales" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaTotalizadoresNoFiscales( Totalizadores AS String ) AS LONG PASCAL FROM "Bematech_FI_VerificaTotalizadoresNoFiscales" LIB "BemaFI32.dll"
+DLL function Bematech_FI_FechaHoraReduccion( Fecha AS String , Hora AS String ) AS LONG PASCAL FROM "Bematech_FI_FechaHoraReduccion" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaTruncamiento( Flag AS string ) AS LONG PASCAL FROM "Bematech_FI_VerificaTruncamiento" LIB "BemaFI32.dll"
+DLL function Bematech_FI_Agregado( ValorIncrementos AS String ) AS LONG PASCAL FROM "Bematech_FI_Agregado" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ContadorBilletePasaje( ContadorPasaje AS String ) AS LONG PASCAL FROM "Bematech_FI_ContadorBilletePasaje" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaAlicuotasIss( Flag AS String ) AS LONG PASCAL FROM "Bematech_FI_VerificaAlicuotasIss" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaFormasPago( Formas AS String ) AS LONG PASCAL FROM "Bematech_FI_VerificaFormasPago" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaRecibimientoNoFiscal( Recebimentos AS String ) AS LONG PASCAL FROM "Bematech_FI_VerificaRecibimientoNoFiscal" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaDepartamentos( Departamentos AS String ) AS LONG PASCAL FROM "Bematech_FI_VerificaDepartamentos" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaTotalizadoresParciales( Totalizadores AS String ) AS LONG PASCAL FROM "Bematech_FI_VerificaTotalizadoresParciales" LIB "BemaFI32.dll"
+DLL function Bematech_FI_RetornoAlicuotas( Alicuotas AS String ) AS LONG PASCAL FROM "Bematech_FI_RetornoAlicuotas" LIB "BemaFI32.dll"
+DLL function Bematech_FI_DatosUltimaReduccion( DadosReduccion AS String ) AS LONG PASCAL FROM "Bematech_FI_DatosUltimaReduccion" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaIndiceAlicuotasIss( Flag AS String ) AS LONG PASCAL FROM "Bematech_FI_VerificaIndiceAlicuotasIss" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ValorFormaPago( FormaPago AS String , Valor AS String ) AS LONG PASCAL FROM "Bematech_FI_ValorFormaPago" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ValorTotalizadorNoFiscal( Totalizador AS String , Valor AS String ) AS LONG PASCAL FROM "Bematech_FI_ValorTotalizadorNoFiscal" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ClavePublica( Clave AS String ) AS LONG PASCAL FROM "Bematech_FI_ClavePublica" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ContadorSecuencial( Retorno AS String ) AS LONG PASCAL FROM "Bematech_FI_ContadorSecuencial" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VentaBrutaDiaria( Valor AS string ) AS LONG PASCAL FROM "Bematech_FI_VentaBrutaDiaria" LIB "BemaFI32.dll"
+DLL function Bematech_FI_BaudrateProgramado( Baudrate AS string ) AS LONG PASCAL FROM "Bematech_FI_BaudrateProgramado" LIB "BemaFI32.dll"
+DLL function Bematech_FI_FlagActivacionAlineamientoIzquierda( Flag AS string ) AS LONG PASCAL FROM "Bematech_FI_FlagActivacionAlineamientoIzquierda" LIB "BemaFI32.dll"
+DLL function Bematech_FI_ImprimeClavePublica( ) AS LONG PASCAL FROM "Bematech_FI_ImprimeClavePublica" LIB "BemaFI32.dll"
+DLL function Bematech_FI_FechaMovimiento( Data AS String ) AS LONG PASCAL FROM "Bematech_FI_FechaMovimiento" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaTipoImpresora( @TipoImpresora AS Integer ) AS LONG PASCAL FROM "Bematech_FI_VerificaTipoImpresora" LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaEstadoImpresora( @ACK AS Integer, @ST1 AS Integer, @ST2 AS Integer ) AS LONG PASCAL FROM "Bematech_FI_VerificaEstadoImpresora" LIB "BemaFI32.dll"
+DLL function Bematech_FI_MonitoramentoPapel( @Lineas AS Integer) AS LONG PASCAL FROM "Bematech_FI_MonitoramentoPapel" LIB "BemaFI32.dll"
+DLL function Bematech_FI_FlagSensores( @Flag AS integer ) AS LONG PASCAL FROM "Bematech_FI_FlagSensores" LIB "BemaFI32.dll"
+DLL function Bematech_FI_FlagsFiscales( @Flag AS Integer ) AS LONG PASCAL FROM "Bematech_FI_FlagsFiscales" LIB "BemaFI32.dll"
+DLL function Bematech_FI_FlagFiscalesIII( @Flag as integer ) AS LONG PASCAL FROM "Bematech_FI_FlagFiscalesIII" LIB "BemaFI32.dll"
+DLL function Bematech_FI_RetornoImpresora( @ACK AS Integer, @ST1 AS Integer, @ST2 AS Integer ) AS LONG PASCAL FROM 'Bematech_FI_RetornoImpresora' LIB "BemaFI32.dll"
+DLL function Bematech_FI_VerificaEstadoGaveta( @EstadoGaveta AS Integer ) AS LONG PASCAL FROM "Bematech_FI_VerificaEstadoGaveta" LIB "BemaFI32.dll"
+*/
