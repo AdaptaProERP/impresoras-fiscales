@@ -46,8 +46,6 @@ PROCE MAIN(cCmd,cOption,uValue,lShow,lMsgErr,lBrowse)
 
      cMemoLog:=MEMOREAD(cFileLog)
 
-? cMemoLog,cFileLog
-
      nNumero:=SQLINCREMENTAL("DPAUDITOR","AUD_NUMERO","AUD_SCLAVE"+GetWhere("=","DLL_BEMATECH"))
      oTable:=OpenTable("SELECT * FROM DPAUDITOR",.F.)  
      oTable:Append()
