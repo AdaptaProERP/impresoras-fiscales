@@ -20,15 +20,17 @@ PROCE MAIN(cCmd,cOption,uValue,lShow,lMsgErr,lBrowse)
            lBrowse:=.F.
 
 
+? cCmd,"<-cCmd",cOption,uValue,lShow,lMsgErr,lBrowse,"cCmd,cOption,uValue,lShow,lMsgErr,lBrowse"
+
    cFileLog:="TEMP\bematech_"+cCmd+".LOG"
 
-   IF cCmd=="Z"
+   IF cCmd=="Z" .OR. "Z"$UPPER(cCmd) .OR. "Z"$UPPER(cOption)
       cTipo  :="REPZ"
       lRunCmd:=.T.
       cResp  :=EJECUTAR("DLL_BEMATECH_Z")
    ENDIF
 
-   IF cCmd=="X"
+   IF (cCmd=="X" .OR. "X"$UPPER(cCmd) .OR. "X"$UPPER(cOption)) .AND. !lRunCmd
       cResp  :=EJECUTAR("DLL_BEMATECH_X")
       cTipo  :="REPX"
       lRunCmd:=.T.
@@ -49,6 +51,7 @@ PROCE MAIN(cCmd,cOption,uValue,lShow,lMsgErr,lBrowse)
      nNumero:=SQLINCREMENTAL("DPAUDITOR","AUD_NUMERO","AUD_SCLAVE"+GetWhere("=","DLL_BEMATECH"))
      oTable:=OpenTable("SELECT * FROM DPAUDITOR",.F.)  
      oTable:Append()
+     oTable:lAuditar:=.F.
      oTable:Replace("AUD_TIPO"  ,"TIME"       )
      oTable:Replace("AUD_FECHAS",oDp:dFecha   )
      oTable:Replace("AUD_FECHAO",DPFECHA()    )
@@ -63,7 +66,7 @@ PROCE MAIN(cCmd,cOption,uValue,lShow,lMsgErr,lBrowse)
      oTable:Replace("AUD_SCLAVE","BEMATECH"   )
      oTable:Replace("AUD_NUMERO",nNumero      )
      oTable:Commit()
-     oTable:End(.T.)
+     oTable:End()
 
   ENDIF
 

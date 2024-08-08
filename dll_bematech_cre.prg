@@ -8,7 +8,7 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN()
+PROCE MAIN(lSay,nLen,cSerie)
    LOCAL cNumero:=SPACE(10),nLenC
 
    IF Empty(oDp:cImpLetra)

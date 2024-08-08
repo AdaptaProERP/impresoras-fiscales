@@ -28,18 +28,18 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
   LOCAL cFacafe, cMaqui, cSerie
   LOCAL cDia, cMes, cAno, cHora, cMin, cSeg, cCu
   LOCAL cNombre, cRif, cDir1, cDir2, cTel1, cAlicuota
-  LOCAL cMsg, cMensaje1:=SPACE(48), cMensaje2:=SPACE(48), cMensaje3:=SPACE(48)
+  LOCAL cMsg:="", cMensaje1:=SPACE(48), cMensaje2:=SPACE(48), cMensaje3:=SPACE(48)
   LOCAL cVALOR:="" // MYSQLGET("DPHISMON","HMN_VALOR","HMN_CODIGO"+GetWhere("=","USD")+"  ORDER BY CONCAT(HMN_FECHA,HMN_HORA) DESC LIMIT 1")
   // LOCAL cCodBema:='11.111.111-11'
   LOCAL oBema, cBema,cFileLog,aMemo:={},aPagos:={},I
-  LOCAL nDivisa:=0,lResp,lCmdRun:=.F.
+  LOCAL nDivisa:=0,lResp,lCmdRun:=.F.,cNomDoc
   //LOCAL error:=.F.
 
   PRIVATE aTipoPago:={}
 
   DEFAULT lMsgErr:=.T.,;
-          lShow  :=.T.,;
-          lBrowse:=.T.,;
+          lShow  :=.F.,;
+          lBrowse:=.F.,;
           oDp:lImpFisModVal:=.T.,;
           oDp:lImpFisRegAud:=.T.,;
           oDp:cImpFisCom   :="BEMATECH",;
@@ -65,10 +65,11 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
 
   ENDIF
 
+// ? cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue,"cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue"
+
   IF lShow
      AEVAL(DIRECTORY("TEMP\*.ERR"),{|a,n| FERASE("TEMP\"+a[1])})
   ENDIF
-
 
   lVenta:=(cTipDoc="FAV" .OR. cTipDoc="TIK")
 
@@ -99,6 +100,9 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
   oBema:cSql    :=""
   oBema:FlagFiscal:=NIL
   oBema:cAlicuota:=""
+  oBema:lTimerOff:=.F.
+
+  SetTimerOff()
 
   IF !Empty(cNumero)
     oBema:cFileLog:="TEMP\"+cTipDoc+ALLTRIM(cNumero)+"_"+LSTR(SECONDS())+".LOG"
@@ -208,10 +212,32 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
 
   ENDIF
 
+// ? cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue,"cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue"
 
-  nDivisa:=EJECUTAR("DPDOCCLIPAGDIV",cCodSuc,cTipDoc,cNumero)
+  oBema:oFile:AppStr("SUC="+cCodSuc+",TIP="+cTipDoc+",#"+cNumero+CRLF)
+
+  nDivisa:=0
+
+  IF lVenta
+    nDivisa:=EJECUTAR("DPDOCCLIPAGDIV",cCodSuc,cTipDoc,cNumero)
+  ENDIF
 
   oTable :=EJECUTAR("DLL_BEMATECH_DATA",cCodSuc,cTipDoc,cNumero)
+
+// oTable:Browse()
+
+  IF oTable:RecCount()=0
+
+     cNomDoc:=ALLTRIM(SQLGET("DPTIPDOCCLI","TDC_DESCRI","TDC_TIPO"+GetWhere("=",cTipDoc)))
+     oBema:cError:="Documento no tiene Productos"
+     oBema:oFile:AppStr(oBema:cError+CRLF)
+
+     oTable:End()
+     BEMA_END()
+     BEMA_CLOSE()
+     RETURN .F.
+ 
+  ENDIF
 
   IF lBrowse
     oTable:Browse()
@@ -220,10 +246,14 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
   oBema:cSql    :=oTable:cSql
 
   // Valida si fue impreso
-  IF oTable:DOC_IMPRES .AND. .F.
+  IF oTable:DOC_IMPRES .AND. !oDp:lImpFisModVal
 
-     oBema:cError:="Documento fué Impreso"
+     // !oDp:lImpFisRegAud
+     cNomDoc:=ALLTRIM(SQLGET("DPTIPDOCCLI","TDC_DESCRI","TDC_TIPO"+GetWhere("=",cTipDoc)))
+     oBema:cError:="Documento fiscal fue Impreso"
      oBema:oFile:AppStr(oBema:cError+CRLF)
+
+     MsgMemo(cNomDoc+CRLF+cTipDoc+"-"+cNumero,oBema:cError)
 
      IF !oDp:lImpFisModVal
        oTable:End()
@@ -250,6 +280,11 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
     cNombre:= PADR(oTable:CLI_NOMBRE,41)+PADR(oTable:CLI_RIF,18)
     nRet   := BmAbreCupom(cNombre) //  PADR(cRif,18),PADR(cNombre,41),cTel1)
 
+    cMsg   :=PADR("Ticket : "+oTable:DOC_NUMERO,48)+;
+             PADR(cMensaje1,48)+;  
+             PADR(cMensaje2,48)+;
+             PADR(cMensaje3,48)
+
   ELSE
 
     cFacafe:=oTable:DOC_FACAFE          // MYSQLGET("DPDOCCLI", "DOC_FACAFE",cWhere)
@@ -269,7 +304,9 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
     cSeg   := cHora[3]
     cHora  := cHora[1]
 
-    nRet   := BmAbreNotaDeCredito(PADR(cNombre,41),cSerie,PADR(cRif,18),cDia,cMes,cAno,cHora,cMin,cSeg,cCu)
+    nRet   := BMABREDEV(PADR(cNombre,41),cSerie,PADR(cRif,18),cDia,cMes,cAno,cHora,cMin,cSeg,cCu)
+
+    cMsg   :=PADR("Ticket : "+oTable:DOC_NUMERO,48) 
 
   ENDIF
 
@@ -342,11 +379,11 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
    cMsg:=PADR("Ticket : "+oTable:DOC_NUMERO,48)
    AEVAL(aMemo,{|a,n| cMsg:=cMsg+PADR(a,48)})
 
-   IF nDivisa>0
+   IF nDivisa>0 .AND. lVenta
      cPagoDolar:=LSTR(nDivisa,14,2) //  STRZERO(nDivisa*100,14)
      // cPagoDolar:=STRTRAN(cPagoDolar,",", ".")
      nRet:=BmIniFecCupIGTF(cPagoDolar)    
-   ELSE
+     // ELSE
      // nRet:=BmIniFecCupIGTF("0")  15/07/2024 No pago con $$ no necesita IGTF
    ENDIF
 
@@ -367,7 +404,16 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
    ENDIF
 */
 
+   SysRefresh(.T.)
+
    BEMA_END()
+
+   SysRefresh(.T.)
+
+   IF !oBema:lImpErr
+     SQLUPDATE("DPDOCCLI","DOC_IMPRES",.T.,cWhere)
+   ENDIF
+
    BEMA_CLOSE()
 
 /*
@@ -378,11 +424,11 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
 */
    SysRefresh(.T.)
 
-   IF !oBema:lImpErr
-     SQLUPDATE("DPDOCCLI","DOC_IMPRES",.T.,cWhere)
-   ENDIF
+//   IF !oBema:lImpErr
+//     SQLUPDATE("DPDOCCLI","DOC_IMPRES",.T.,cWhere)
+//   ENDIF
 
-   BEMA_CLOSE()
+//   BEMA_CLOSE()
 
 RETURN !oBema:lImpErr 
 
@@ -418,10 +464,12 @@ FUNCTION BEMA_CLOSE()
     oDp:cFileToScr:=nil
   ENDIF
 
+  SysRefresh(.T.)
+
   cMemo:=""
   AEVAL(DIRECTORY("TEMP\*.ERR"),{|a,n,cLine| cLine:=MEMOREAD("TEMP\"+a[1]),IF(oBema:lShow,MsgMemo(cLine),NIL),cMemo:=cMemo+cLine+CRLF})
 
-  IF !Empty(cMemo)
+  IF !Empty(cMemo) .AND. ValType(oBema:oFile)="O"
     oBema:oFile:AppStr(cMemo+CRLF)
   ENDIF
 
@@ -451,6 +499,7 @@ FUNCTION BEMA_CLOSE()
 
     nNumero:=SQLINCREMENTAL("DPAUDITOR","AUD_NUMERO","AUD_SCLAVE"+GetWhere("=","DLL_BEMATECH"))
     oTable:=OpenTable("SELECT * FROM DPAUDITOR",.F.)
+    oTable:lAuditar:=.F.
     oTable:Append()
     oTable:Replace("AUD_FECHAS",oDp:dFecha    )
     oTable:Replace("AUD_FECHAO",DPFECHA()     )
@@ -469,7 +518,12 @@ FUNCTION BEMA_CLOSE()
 
   ENDIF
 
-  IF oDp:lImpFisModVal .OR. oBema:lError
+  IF !oBema:lTimerOff
+     oBema:lTimerOff:=.T.
+     SetTimerOn()
+  ENDIF
+
+  IF (oDp:lImpFisModVal .OR. oBema:lError) 
     VIEWRTF(oBema:cFileLog,"Documento "+oBema:cTipDoc+oBema:cNumero)
   ENDIF
 
@@ -494,7 +548,7 @@ FUNCTION BmAbreCupom(cNombCli)
 
 RETURN uResult
 
-FUNCTION BmAbreNotaDeCredito( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
+FUNCTION BMABREDEV( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
   LOCAL cFunc   :="Bematech_FI_AbreNotaDeCredito"
   LOCAL cFarProc,uResult
 
@@ -505,7 +559,7 @@ FUNCTION BmAbreNotaDeCredito( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSe
 
   ENDIF
 
-  oBema:oFile:AppStr("BmAbreNotaDeCredito( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )"+CRLF+;
+  oBema:oFile:AppStr(cFunc+"( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )"+CRLF+;
                      "cNombre->"+CTOO(cNombre,"C")+","+CRLF+;
                      "cSerie ->"+CTOO(cSerie ,"C")+","+CRLF+;
                      "cRif   ->"+CTOO(cRif   ,"C")+","+CRLF+;
@@ -831,7 +885,7 @@ FUNCTION BEMA_END()
      oDp:nBemaDll:=NIL
   ENDIF
 
-  IF TYPE("oBEMA")="O" .AND. ValType(oBema:oFile)="O"
+  IF ValType(oBema:oFile)="O"
      oBema:oFile:AppStr("BEMA_END()"+CRLF)
      oBema:oFile:End()
      oBema:oFile:=NIL

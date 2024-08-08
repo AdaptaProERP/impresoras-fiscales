@@ -15,6 +15,8 @@ PROCE MAIN(cCmd,cOption,lAuto,cLetra,cTitle)
            cOption:="Reporte Z ",;
            lAuto  :=.F.,;
            cTitle :=cOption
+
+// ? cCmd,cOption,lAuto,cLetra,cTitle,"cCmd,cOption,lAuto,cLetra,cTitle"
  
    IF ISSQLFIND("DPSERIEFISCAL","SFI_PCNAME"+GetWhere("=",oDp:cPcName)+"  AND SFI_AUTDET=1 AND NOT SFI_IMPFIS"+GetWhere(" LIKE ","%Ningun%"))
       // Debe Actualizar el Puerto del AutoDetec
@@ -47,7 +49,7 @@ PROCE MAIN(cCmd,cOption,lAuto,cLetra,cTitle)
    oDp:cImpFiscal:=oSerFis:SFI_IMPFIS
    oDp:cImpFisCom:=ALLTRIM(oSerFis:SFI_PUERTO)
 
-   IF !MsgNoYes("Desea Ejecutar: "+cTitle,oDp:cMsgNoYes)
+   IF !MsgNoYes("Desea Ejecutar: "+cTitle+" en "+oDp:cImpFiscal,oDp:cMsgNoYes)
       RETURN .T.
    ENDIF
 
@@ -56,21 +58,27 @@ PROCE MAIN(cCmd,cOption,lAuto,cLetra,cTitle)
    IF "EPSON"$oDp:cImpFiscal
       lRun :=.T.
       cResp:=EJECUTAR("DLL_EPSON_CMD",cCmd,cOption)
-      EJECUTAR("TIKTORVT",oDp:cSucursal,oDp:dFecha,oDp:dFecha)
       cError:=MemoRead("TEMP\IMPFISCAL_CMD.TXT")
    ENDIF
 
    IF "TFHK_EXE"==ALLTRIM(oDp:cImpFiscal)
       lRun :=.T.
       cResp:=EJECUTAR("RUNEXE_TFHKA_CMD",cCmd,cOption)
-      // EJECUTAR("TIKTORVT",oDp:cSucursal,oDp:dFecha,oDp:dFecha)
-      RETURN .F.
    ENDIF
 
    IF "TFHK_DLL"==ALLTRIM(UPPER(oDp:cImpFiscal))
       lRun:=.T.
       EJECUTAR("DLL_TFHKA_CMD",cCmd,cOption)
-      RETURN .F.
+   ENDIF
+
+   IF "BEMATECH"$oDp:cImpFiscal
+      lRun:=.T.
+      EJECUTAR("DLL_BEMATECH_CMD",cCmd,cOption)
+   ENDIF
+
+   // Resumen Diario de Deventas
+   IF lRun .AND. "Z"==cCmd
+      RESUMENDIARIO()
    ENDIF
 
    IF !lRun
@@ -82,5 +90,15 @@ PROCE MAIN(cCmd,cOption,lAuto,cLetra,cTitle)
    ENDIF
 
 RETURN cResp
+
+/*
+// Realizar resumen diario de Ventas
+*/
+FUNCTION RESUMENDIARIO()
+   LOCAL cCodSuc:=oDp:cSucursal,dDesde:=oDp:dFecha,dHasta:=oDp:dFecha,aTipDoc:={"TIK","DEV"},lReset:=.F.
+
+   EJECUTAR("TIKTORDV",cCodSuc,dDesde,dHasta,aTipDoc,lReset)
+  
+RETURN .T.
 // EOF
 
