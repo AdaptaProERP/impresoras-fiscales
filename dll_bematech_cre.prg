@@ -25,7 +25,7 @@ PROCE MAIN(lSay,nLen,cSerie)
    EJECUTAR("DPSERIEFISCALLOAD")
    EJECUTAR("DLL_BEMATECH",NIL,NIL,NIL,NIL,lSay,NIL,"CRE")
 
-   cNumero:=oDp:uBemaResp+1 // Incrementa el siguiente número
+   cNumero:=CTOO(oDp:cBemaCRE,"N")+1 // Incrementa el siguiente número
 
    cNumero:=CTOO(cNumero,"C")
    cNumero:=cSerie+REPLI("0",nLenC-LEN(cNumero))+cNumero

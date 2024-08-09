@@ -27,10 +27,12 @@ PROCE MAIN(lSay,nLen,cSerie)
    EJECUTAR("DPSERIEFISCALLOAD")
    EJECUTAR("DLL_BEMATECH",NIL,NIL,NIL,NIL,lSay,NIL,"FAV")
 
-   cNumero:=VAL(oDp:cBemaFAV)+1 // Incrementa el siguiente número
+// ? oDp:cBemaFAV,"oDp:cBemaFAV"
 
-   cNumero:=CTOO(cNumero,"C")
-   cNumero:=cSerie+REPLI("0",nLenC-LEN(cNumero))+cNumero
+   cNumero:=CTOO(oDp:cBemaFAV,"N")+1 // Incrementa el siguiente número
+
+   cNumero:=ALLTRIM(CTOO(cNumero,"C"))
+   cNumero:=ALLTRIM(cSerie)+REPLI("0",nLenC-LEN(cNumero))+cNumero
 
 RETURN cNumero
 // eof

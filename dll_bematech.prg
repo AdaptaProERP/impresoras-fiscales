@@ -288,6 +288,9 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
   ELSE
 
     cFacafe:=oTable:DOC_FACAFE          // MYSQLGET("DPDOCCLI", "DOC_FACAFE",cWhere)
+
+
+? oTable:DOC_FACAFE,"oTable:DOC_FACAFE, DEBE SER EL ORIGEN"
     cMaqui:=PADR(oTable:SFI_SERIMP,10)  // ALLTRIM(PADR(MYSQLGET("DPEQUIPOSPOS","EPV_IMPFIS","EPV_SERIEF"=oTable:DOC_SERFIS),10))
 
     cNombre:= ALLTRIM(PADR(oTable:CLI_NOMBRE,41))
@@ -533,10 +536,11 @@ RETURN .T.
 /*
 // Abrir el Cupon
 */
+
 FUNCTION BmAbreCupom(cNombCli)
   LOCAL cFarProc:= NIL
   LOCAL uResult := NIL
-  LOCAL cFunc:="Bematech_FI_AbreCupom"
+  LOCAL cFunc:="Bematech_FI_AbreCupon"
 
   IF !oDp:lImpFisModVal
     cFarProc:= GetProcAddress( oDp:nBemaDLL,cFunc,.T.,7,9)
@@ -552,10 +556,12 @@ FUNCTION BMABREDEV( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
   LOCAL cFunc   :="Bematech_FI_AbreNotaDeCredito"
   LOCAL cFarProc,uResult
 
+  cCu:=IF(Empty(cCu),"0",cCu) // Sin este valor, no se genera la nota de crédito 8/8/2024
+
   IF !oDp:lImpFisModVal
 
    cFarProc:= GetProcAddress( oDp:nBemaDLL,cFunc, .T., 7,9,9,9,9,9,9,9,9,9,9 )
-   uResult := CallDLL( cFarProc,cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
+   uResult := CallDLL(cFarProc,cNombre ,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
 
   ENDIF
 
@@ -1061,7 +1067,11 @@ RETURN uResult
 */
 FUNCTION BEMA_FAV()
   LOCAL cNumFav:=SPACE(06), cFarProc,uResult
-  LOCAL cFunc  :="Bematech_FI_NumeroComprobanteFiscal"  
+  LOCAL cFunc  :="Bematech_FI_NumeroComprobanteFiscal" 
+
+  cFunc:="Bematech_FI_ContadorCuponFiscalMFD"
+
+  oDp:cBemaFAV:=0
 
   IF !oDp:lImpFisModVal
     cFarProc:=GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7,9) 
@@ -1069,8 +1079,10 @@ FUNCTION BEMA_FAV()
     oDp:cBemaFAV:=cNumFav
   ENDIF
 
+// ? "aqui es bema_Fav",oDp:cBemaFAV,cFunc
+
   IF ValType(oBema:oFile)="O"
-    oBema:oFile:AppStr(cFunc+"(),Result->"+CTOO(uResult,"C")+CRLF)
+    oBema:oFile:AppStr(cFunc+"(),Result->"+CTOO(uResult,"C")+" #"+CTOO(oDp:cBemaFAV,"C")+CRLF)
   ENDIF
 
   SysRefresh(.T.)
@@ -1084,14 +1096,18 @@ FUNCTION BEMA_CRE()
   LOCAL cNumCre:=SPACE(06),uResult:=NIL, cFarProc
   LOCAL cFunc  :="Bematech_FI_ContadorNotaDeCreditoMFD"  
 
+  oDp:cBemaCRE:=""
+
   IF !oDp:lImpFisModVal
     cFarProc:=GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7,9) 
     uResult :=CallDLL(cFarProc,@cNumCre)
     oDp:cBemaCRE:=cNumCre
   ENDIF
 
+//? oDp:cBemaCRE,"bemacre",cFunc
+
   IF ValType(oBema:oFile)="O"
-    oBema:oFile:AppStr(cFunc+"(),Result->"+CTOO(uResult,"C")+CRLF)
+    oBema:oFile:AppStr(cFunc+"(),Result->"+CTOO(uResult,"C")+" #"+CTOO(oDp:cBemaCRE,"C")+CRLF)
   ENDIF
 
   SysRefresh(.T.)
