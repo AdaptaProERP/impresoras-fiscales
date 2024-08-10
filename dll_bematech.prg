@@ -29,13 +29,12 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
   LOCAL cDia, cMes, cAno, cHora, cMin, cSeg, cCu
   LOCAL cNombre, cRif, cDir1, cDir2, cTel1, cAlicuota
   LOCAL cMsg:="", cMensaje1:=SPACE(48), cMensaje2:=SPACE(48), cMensaje3:=SPACE(48)
-  LOCAL cVALOR:="" // MYSQLGET("DPHISMON","HMN_VALOR","HMN_CODIGO"+GetWhere("=","USD")+"  ORDER BY CONCAT(HMN_FECHA,HMN_HORA) DESC LIMIT 1")
-  // LOCAL cCodBema:='11.111.111-11'
+  LOCAL cVALOR:="" 
   LOCAL oBema, cBema,cFileLog,aMemo:={},aPagos:={},I
   LOCAL nDivisa:=0,lResp,lCmdRun:=.F.,cNomDoc
-  //LOCAL error:=.F.
-
   PRIVATE aTipoPago:={}
+
+// ? cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue,"cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue"
 
   DEFAULT lMsgErr:=.T.,;
           lShow  :=.F.,;
@@ -101,6 +100,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
   oBema:FlagFiscal:=NIL
   oBema:cAlicuota:=""
   oBema:lTimerOff:=.F.
+  oBema:cSerial  :=""
 
   SetTimerOff()
 
@@ -140,6 +140,8 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
   IF Empty(oDp:nBemaDLL)
     FreeLibrary(oDp:nBemaDll)
   ENDIF
+
+//  ? BmPrendida(),"BmPrendida()"
 
   /*
   // Comando de la Impresora, X,Z
@@ -211,6 +213,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
      ENDIF
 
   ENDIF
+
 
 // ? cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue,"cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue"
 
@@ -290,7 +293,6 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
     cFacafe:=oTable:DOC_FACAFE          // MYSQLGET("DPDOCCLI", "DOC_FACAFE",cWhere)
 
 
-? oTable:DOC_FACAFE,"oTable:DOC_FACAFE, DEBE SER EL ORIGEN"
     cMaqui:=PADR(oTable:SFI_SERIMP,10)  // ALLTRIM(PADR(MYSQLGET("DPEQUIPOSPOS","EPV_IMPFIS","EPV_SERIEF"=oTable:DOC_SERFIS),10))
 
     cNombre:= ALLTRIM(PADR(oTable:CLI_NOMBRE,41))
@@ -462,6 +464,7 @@ RETURN .T.
 FUNCTION BEMA_CLOSE()
   LOCAL lSave:=.F.,cMemo:="",nNumero,oFont 
   LOCAL cTipo:=IF(oBema:lError,"NIMP","RAUD")
+  LOCAL cFileLog
 
   IF !Empty(oDp:cFileToScr)
     oDp:cFileToScr:=nil
@@ -494,7 +497,9 @@ FUNCTION BEMA_CLOSE()
      lSave:=.T.
   ENDIF
 
-  IF lSave
+  IF lSave .AND. .F.
+
+    SysRefresh(.t.)
 
     cMemo:=MemoRead(oBema:cFileLog)+CRLF+oBema:cSql
 
@@ -519,6 +524,12 @@ FUNCTION BEMA_CLOSE()
     oTable:Commit()
     oTable:End(.T.)
 
+  ELSE
+
+    cMemo   :=MemoRead(oBema:cFileLog)+CRLF+oBema:cSql
+    cFileLog:="bematech\"+cFileNoExt(oBema:cFileLog)
+    dpwrite(cFileLog,cMemo)
+
   ENDIF
 
   IF !oBema:lTimerOff
@@ -530,8 +541,29 @@ FUNCTION BEMA_CLOSE()
     VIEWRTF(oBema:cFileLog,"Documento "+oBema:cTipDoc+oBema:cNumero)
   ENDIF
 
+  SysRefresh(.T.)
+
 RETURN .T.
 
+/*
+// Obtiene Serial de la memoria fiscal
+*/
+FUNCTION BMSERIAL()
+   LOCAL cFarProc:= NIL
+   LOCAL uResult := NIL
+   LOCAL cFunc   :="Bematech_FI_NumeroSerie"
+   LOCAL cSerial :=SPACE(20)
+
+   IF !oDp:lImpFisModVal
+     cFarProc:= GetProcAddress( oDp:nBemaDLL,cFunc,.T.,7,9)
+     uResult := CallDLL( cFarProc,@cSerial)
+   ENDIF
+
+   oBema:cSerial:=cSerial
+   oBema:oFile:AppStr(cFunc+"()"+CRLF+"cSerial="+CTOO(cSerial,"C")+CRLF+;
+                      ",nResult= "+CTOO(uResult,"C")+CRLF)
+
+RETURN .T.
 
 /*
 // Abrir el Cupon
@@ -551,6 +583,24 @@ FUNCTION BmAbreCupom(cNombCli)
                      ",nResult= "+CTOO(uResult,"C")+CRLF)
 
 RETURN uResult
+
+FUNCTION BMPRENDIDA()
+  LOCAL cFunc   :="Bematech_FI_VerificaImpresoraPrendida" 
+  LOCAL cFarProc:= NIL
+  LOCAL cResult :=""
+  LOCAL uResult := 0
+
+  IF !oDp:lImpFisModVal
+     cFarProc:= GetProcAddress( oDp:nBemaDLL,cFunc, .T., 7) // ,9)
+     uResult := CallDLL( cFarProc) // ,@cResult)
+  ENDIF
+
+  BEMA_ERROR(nRet,.T.)
+
+  oBema:oFile:AppStr(cFunc+"()"+CRLF+" nResult="      +CTOO(uResult  ,"C")+CRLF )
+
+RETURN uResult
+
 
 FUNCTION BMABREDEV( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
   LOCAL cFunc   :="Bematech_FI_AbreNotaDeCredito"
@@ -707,6 +757,9 @@ FUNCTION BEMA_INI()
 
    ENDIF
 
+   BMSERIAL() // Obtiene Serial de la impresora Fiscal
+
+
 //   BmFlagFiscal()
 //   BEMA_ALICUOTAS()
 
@@ -747,7 +800,7 @@ FUNCTION BEMA_ERROR(nRet,lShow)
   LOCAL cError:=""
 
   DEFAULT nRet  :=1,;
-          lShow := .T.
+          lShow := oBema:lShow
 
   // If( lShow == nil, lShow := .T., ) 
 
@@ -789,10 +842,12 @@ FUNCTION BEMA_ERROR(nRet,lShow)
 
    oBema:oFile:AppStr(cError+CRLF)
 
-   IF oBema:lShow
+   IF lShow
+
+     // oBema:lShow
 
      IF !oDp:lImpFisModVal
-       MensajeErr(cError,"Error Impresora Bematech")
+       MsgMemo(cError,"Error Impresora Bematech")
      ENDIF
 
    ENDIF
@@ -906,6 +961,8 @@ FUNCTION BEMA_END()
     oBema:lViewRtf:=.T.
 
  ENDIF
+
+ SysRefresh(.T.)
 
 RETURN .T.
 
