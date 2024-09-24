@@ -10,11 +10,8 @@
 
 PROCE MAIN(cLetra,lView)
   LOCAL cCodSuc,cTipDoc:="ZFF",cNumero,cCodCli,nCxC:=0,nNeto:=0,nNumMem
-  LOCAL aData:={},aLines:={},cMemo,nAt,cFile,cWhere,dFecha,dFechaD,cHora,cNumFav,i,cFavFin:=""
-  LOCAL nMtoExe:=0,nBasIGTF:=0,nMtoIgtf:=0,nMtoNeto:=0,nLen,cLine,cBas,cMto,aVta:={},aCre:={},aVars:={},aFields,aValues
-  LOCAL nBasGN :=0,nMtoGN:=0
-  LOCAL nBasRD :=0,nMtoRD:=0
-  LOCAL nBasS1 :=0,nMtoS1:=0
+  LOCAL aData:={},aLines:={},cMemo,nAt,cFile,cWhere,dFecha,cHora,I
+  LOCAL nLen,cLine,cBas,cMto,aVta:={},aCre:={},aVars:={},aFields,aValues
   LOCAL oDb:=OpenOdbc(oDp:cDsnData)
   LOCAL aFiles:={},cFileOut,cZeta,oFont
 
@@ -42,10 +39,6 @@ PROCE MAIN(cLetra,lView)
   cZeta:=oDp:cZeta
   nLen :=LEN(cZeta)
   cZeta:=STRZERO(VAL(cZeta)+1,nLen)
-
- // IF Empty(oDp:cZeta)
- //   RETURN .T.
- // ENDIF
 
   cMemo  :=MemoRead(oDp:cFileBema)
 
@@ -77,10 +70,6 @@ PROCE MAIN(cLetra,lView)
     RETURN .F.
 
   ENDIF
-
-  // ViewArray(aFiles)
-  // ? dFecha,cFileOut
-  // return 
 
   cMemo  :=MemoRead(cFile)
   cCodSuc:=SQLGET("DPSERIEFISCAL","SFI_CODSUC","SFI_LETRA"+GetWhere("=",cLetra))
@@ -129,14 +118,10 @@ PROCE MAIN(cLetra,lView)
 
   ENDIF
 
-// ? CLPCOPY(cMemo)
-
   aData:=STRTRAN(cMemo,CRLF,CHR(10))
 
   aData   :=_VECTOR(aData,CHR(10))
   
-// ViewArray(aData)
-
   IF !TYPE("oZetaB")="O"
     TDpClass():New(NIL,"oZetaB")
   ENDIF
@@ -159,14 +144,15 @@ PROCE MAIN(cLetra,lView)
   oZetaB:CREM_IVAR08:=0.00
   oZetaB:CREB_BIA31 :=0.00
   oZetaB:CREM_IVAA31:=0.00
+  oZetaB:nMtoIgtf   :=0.00
 
   // Fecha
   nAt    :=ASCAN(aData,{|a,n| "RIF"$a} )
-  dFechaD:=oDp:dFecha
+  // OJO, aqui debemos validar el ZETA corresponda con la empresa
+  oZetaB:dFecha:=oDp:dFecha
 
   IF nAt>0
-    dFechaD:=CTOD(LEFT(aData[nAt+1],10))
-    // ? nAt,aData[nAt+1],dFecha,"aqui debe ser la fecga"
+    oZetaB:dFecha:=CTOD(LEFT(aData[nAt+1],10))
   ENDIF
 
   oZetaB:cFavFin :=GETULTIMOS("Última Factura")
@@ -174,23 +160,8 @@ PROCE MAIN(cLetra,lView)
   oZetaB:cZetaFin:=GETULTIMOS("Reporte Z")
 
   oZetaB:cFavCant:=GETCONTADORES("Facturas desde la Última Z") // Cantidad de Facturas, Obtenemos la Factura Inicial
-
   oZetaB:cFavIni :=STRZERO(VAL(oZetaB:cFavFin)-VAL(oZetaB:cFavCant),6) // factura Inicial
 
-// ? oZetaB:cFavCant,"oZetaB:cFavCant"
-// ? oZetaB:cFavFin,oZetaB:cCreFin,oZetaB:cZetaFin,"oZetaB:cZetaFin"
-
-/*
-  nAt:=ASCAN(aData,{|a,n| "Última Factura"$a})
-  IF nAt>0
-    cFavFin:=ALLTRIM(STRTRAN(aData[nAt],"Última Factura",""))
-    cFavFin:=LEFT(cFavFin,6)
-? "AQUI CORTA",nAt,cFavFin
-  ENDIF
-*/
-
-  // ? nAt,"ultima factura",aData[nAt],cFavFin
-  // Ventas
   nAt:=ASCAN(aData,{|a,n|"-Totales Por Base Imponible-"$a})
   IF nAt>0
 
@@ -217,24 +188,6 @@ PROCE MAIN(cLetra,lView)
   // Ventas
   ZFFSETVAR(aCre,"CRE")
 
-  // ViewArray(aVars)
-  // 
-  // RETURN .T.
-
-  nMtoExe :=0 // BEMAGETVALUE("Exentos",aData,"N")
-  dFecha  :=0 // BEMAGETVALUE("/"      ,aData,"D") // aqui toma la fecha
-  cNumFav :=0 // BEMAGETVALUE("Contador de Factura:",aData,"C")
-  nBasIGTF:=0 // BEMAGETVALUE("IGTF03,00% =",aData,"N")
-  nBasGN  :=0 // BEMAGETVALUE("BI G16,00% =",aData,"N")
-  nBasRD  :=0 // BEMAGETVALUE("BI R08,00% =",aData,"N")
-  nBasS1  :=0 // BEMAGETVALUE("BI A31,00%",aData,"N")
-
-  nMtoNeto:=0 // BEMAGETVALUE("VENTA NETA:" ,aData,"N")
-
-// ViewArray(aData)
-
- 
-  // Exento
   aData:={}
 
   FOR I=1 TO LEN(aVars)
@@ -248,26 +201,13 @@ PROCE MAIN(cLetra,lView)
 
   NEXT I
 
-// ViewArray(aData)
-//? oZetaB:nNeto,"oZetaB:nNeto"
-// ? dFechaD,"dFechaD"
-
-  aFields:={"DOC_GIRNUM","DOC_MTOEXE"        ,"DOC_NETO"  ,"DOC_FECHA","DOC_HORA","DOC_NUMFIS","DOC_SERFIS","DOC_OTROS","DOC_CODIGO","DOC_IMPOTR",;
+  aFields:={"DOC_GIRNUM","DOC_MTOEXE"        ,"DOC_NETO"  ,"DOC_FECHA","DOC_HORA","DOC_SERFIS","DOC_OTROS","DOC_CODIGO","DOC_IMPOTR",;
             "DOC_NUMFIS","DOC_PLAEXP"}
 
-  aValues:={oDp:cZeta   ,oZetaB:VTAB_Exentos,oZetaB:nNeto,dFechaD     ,cHora     ,cNumFav     ,cLetra      ,nMtoIgtf   ,cCodCli      ,oZetaB:VTAB_Percibidos,;
+  aValues:={oDp:cZeta   ,oZetaB:VTAB_Exentos,oZetaB:nNeto,oZetaB:dFecha,cHora    ,cLetra      ,oZetaB:nMtoIgtf   ,cCodCli      ,oZetaB:VTAB_Percibidos,;
             oZetaB:cFavFin,oZetaB:cFavIni}
 
-// ,cWhere)
-
   SQLUPDATE("DPDOCCLI",aFields,aValues,cWhere)
-
-// {"DOC_GIRNUM","DOC_MTOEXE"        ,"DOC_NETO"  ,"DOC_FECHA","DOC_HORA","DOC_NUMFIS","DOC_SERFIS","DOC_OTROS","DOC_CODIGO","DOC_IMPOTR","DOC_NUMFIS
-//               },;
-//                       {oDp:cZeta   ,oZetaB:VTAB_Exentos,oZetaB:nNeto,dFechaD     ,cHora     ,cNumFav     ,cLetra      ,nMtoIgtf   ,cCodCli      ,oZetaB:VTAB_Percibidos},cWhere)
-
-
-  // AADD(aData,{oDp:cCtaIndef,NIL,nMtoExe,"EX",0,nMtoExe})
 
   EJECUTAR("DPDOCCLICTAADD",cCodSuc,cTipDoc,cNumero,NIL,cLetra,aData)
 
@@ -275,78 +215,9 @@ PROCE MAIN(cLetra,lView)
 
 RETURN .T.
 
-/*
-FUNCTION BEMAGETVALUE(cVar,aData,cType)
-  LOCAL  nAt   :=ASCAN(aData,{|a,n| cVar$a})
-  LOCAL  nValue:=0,cLine
-
-  IF nAt>0 .AND. "IGTF03,00% ="$cVar
-
-     cLine :=LEFT(aData[nAt],24)
-     cLine :=STRTRAN(cLine,cVar,"")
-     cLine :=STRTRAN(cLine,".","")
-     cLine :=STRTRAN(cLine,",",".")
-     nValue:=CTOO(cLine,"N")
-
-     // Monto IGTF
-     cLine:=RIGHT(aData[nAt],10)   // % IGTF
-     cLine:=STRTRAN(cLine,".","" )
-     cLine:=STRTRAN(cLine,",",".")
-
-     nMtoIgtf:=VAL(cLine)
-
-     RETURN nValue
-
-  ENDIF
-
-  IF nAt>0 .AND. "BI G16,00% ="$cVar
-
-     cLine :=LEFT(aData[nAt],24)
-     cLine :=STRTRAN(cLine,cVar,"")
-     cLine :=STRTRAN(cLine,".","")
-     cLine :=STRTRAN(cLine,",",".")
-     nValue:=CTOO(cLine,"N")
-
-     // Monto IGTF
-     cLine:=RIGHT(aData[nAt],10)   // % IGTF
-     cLine:=STRTRAN(cLine,".","" )
-     cLine:=STRTRAN(cLine,",",".")
-
-     nMtoGN:=VAL(cLine)
-
-     RETURN nValue
-
-  ENDIF
-
-
-  IF nAt>0 .AND. "."$aData[nAt] .AND. cType="N"
-    cLine :=ALLTRIM(STRTRAN(aData[nAt],cVar,""))
-    cLine :=STRTRAN(cLine,"."    ,"")
-    cLine :=STRTRAN(cLine,","    ,".")
-    nValue:=CTOO(cLine,"N")
-    nValue:=VAL(cLine)
-    RETURN nValue
-  ENDIF
-
-  IF nAt>0 .AND. "/"$aData[nAt] .AND. cType="D"
-    cLine :=CTOD(LEFT(aData[nAt],10))
-    cHora :=SUBS(aData[nAt],12,8)
-    RETURN cLine
-  ENDIF
-
-  IF nAt>0 .AND. cType="C"
-    cLine :=ALLTRIM(STRTRAN(aData[nAt],cVar,""))
-    RETURN cLine
-  ENDIF
-
-RETURN nValue
-*/
-
 FUNCTION ZFFSETVAR(aData,cVar)
    LOCAL I,cLine,cBas,cMto,aQuitar:={"%"," ","_00","."}
    LOCAL nValBas,nValMto,aBas,aMto,cIVA:="",aLine,nPor:=0
-
-   // ADEPURA(aData,{|a,n| !"%"$a})
 
    FOR I=1 TO LEN(aData)
      cLine:=aData[I] // STRTRAN(aData[I],",00%","___")
@@ -376,7 +247,6 @@ FUNCTION ZFFSETVAR(aData,cVar)
        cIVA:="IP" // iva Percibido
      ENDIF
 
-
      IF "BIG"$aBas[1]
        cIVA:="GN"
      ENDIF
@@ -396,7 +266,6 @@ FUNCTION ZFFSETVAR(aData,cVar)
      ENDIF
 
      oZetaB:SET(aBas[1],aBas[2])
-     //  AADD(aVars,{aBas[1],aBas[2],cIVA})
 
      // Monto
      aMto:=_VECTOR(cMto,"=")
@@ -429,8 +298,6 @@ FUNCTION GETULTIMOS(cName)
       cValue:=SUBS(aData[nAt],16,6)
    ENDIF
 
-   // ? nAt,cName,cValue
-
 RETURN cValue
 
 /*
@@ -446,5 +313,104 @@ FUNCTION GETCONTADORES(cName)
    ENDIF
 
 RETURN cValue
+
+/*
+          SOLUCIONES POS VENEZUELA, C.A
+  AV. PRINCIPAL DE LOS CHORROS EDIFICIO OZALID
+        PISO MEZZANINA, MUNICIPIO SUCRE
+   PARROQUIA LEONCIO MARTINEZ LOS DOS CAMINOS
+         EDO. MIRANDA, ZONA POSTAL 1070
+            "EQUIPO DE LABORATORIO"
+RIF:J-313526010         
+24/09/2024 17:17:54                   COO:000195
+       LECTURA X        
+                   NO FISCAL                    
+-------------------CONTADORES-------------------
+Contador General de Operación No Fiscal:  000008
+Contador de Factura:                      000109
+Contador de Nota de Crédito:              000009
+Operaciones No Fiscales desde la Última Z 000000
+Facturas desde la Última Z                000002
+Notas de Crédito desde la Última Z        000000
+RMF desde la Última Z                     000000
+----------------TOTALES DEL DÍA-----------------
+VENTA BRUTA DIARIA:                    11.092,65
+DESCUENTOS:                                 0,00
+NOTAS DE CRÉDITO:                           0,00
+VENTA NETA:                            11.092,65
+---------------Resumen Tributados---------------
+Tot.     Valor Acumulado(Bs  )    Impuesto(Bs  )
+Tributados            1.472,40            235,58
+Exentos               9.620,25
+Percibidos                0,00
+Notas de Crédito          0,00              0,00
+Suma:                11.092,65            235,58
+-----------Totales Por Base Imponible-----------
+IGTF03,00% =    2.628,23 IGTF 03,00% =     78,85
+Exentos    =    9.620,25
+Percibidos =        0,00
+BI G16,00% =    1.472,40 IVA G16,00% =    235,58
+BI R08,00% =        0,00 IVA R08,00% =      0,00
+BI A31,00% =        0,00 IVA A31,00% =      0,00
+-------Notas de Crédito y/o Devoluciones--------
+IGTF03,00% =        0,00 IGTF 03,00% =      0,00
+Exentos    =        0,00
+Percibidos =        0,00
+BI G16,00% =        0,00 IVA G16,00% =      0,00
+BI R08,00% =        0,00 IVA R08,00% =      0,00
+BI A31,00% =        0,00 IVA A31,00% =      0,00
+***********GRANDES TOTALES ACUMULADOS***********
+*GT:              186.352,06 * GT IVA:                  385,34 *
+---------------Últimos Documentos---------------
+Última Factura 000109 24/09/2024 15:16:03 Bs           2.846,72
+Nota Crédito   000009 09/08/2024 10:15:22 Bs             917,07
+Doc. No Fiscal 000008 23/09/2024 00:00:21 Bs               0,00
+Reporte Z      000032 23/09/2024 00:00:01
+---------Descuentos Por Base Imponible----------
+IGTF03,00% =        0,00 IGTF 03,00% =      0,00
+Exentos    =        0,00
+Percibidos =        0,00
+BI G16,00% =        0,00 IVA G16,00% =      0,00
+BI R08,00% =        0,00 IVA R08,00% =      0,00
+BI A31,00% =        0,00 IVA A31,00% =      0,00
+---------Anulaciones Por Base Imponible---------
+IGTF03,00% =        0,00 IGTF 03,00% =      0,00
+Exentos    =        0,00
+Percibidos =        0,00
+BI G16,00% =        0,00 IVA G16,00% =      0,00
+BI R08,00% =        0,00 IVA R08,00% =      0,00
+BI A31,00% =        0,00 IVA A31,00% =      0,00
+---------Incrementos Por Base Imponible---------
+IGTF03,00% =        0,00 IGTF 03,00% =      0,00
+Exentos    =        0,00
+Percibidos =        0,00
+BI G16,00% =        0,00 IVA G16,00% =      0,00
+BI R08,00% =        0,00 IVA R08,00% =      0,00
+BI A31,00% =        0,00 IVA A31,00% =      0,00
+-----------TOTALIZADORES NO FISCALES------------
+29 Retirada de caja   : 0000                0,00
+30 Fondo de caja      : 0000                0,00
+Total de Oper. No Fiscales Bs               0,00
+RECARGO   NO FISCAL:                        0,00
+DESCUENTO NO FISCAL:                        0,00
+ANULACIÓN NO FISCAL:                        0,00
+--------------INFORME GERENCIAL  ---------------
+01 Informe General                          0000
+02 Informe de Trans.                        0000
+---------------FORMAS DE PAGO    ---------------
+01 Efectivo             (0002)         11.407,08
+02 Depósito         (V) (0000)              0,00
+03 Pago por Transf  (V) (0000)              0,00
+04 EFECTIVO         (V) (0000)              0,00
+RZ restantes:    2209  MA restante :      99,99%
+BEMATECH        MP-4000 TH FI        ECF-IF 
+IQQQQQQQQQQQQWOURYEQU      CAJA:0001 TIENDA:0001
+                 VERSIÓN:01.00.23 1FC9380014 
+
+
+
+
+         SENIAT         
+*/
 
 // EOF
