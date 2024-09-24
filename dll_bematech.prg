@@ -67,7 +67,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
 // ? cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue,"cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue"
 
   IF lShow
-     AEVAL(DIRECTORY("TEMP\*.ERR"),{|a,n| FERASE("TEMP\"+a[1])})
+    //  AEVAL(DIRECTORY("TEMP\*.ERR"),{|a,n| FERASE("TEMP\"+a[1])})
   ENDIF
 
   lVenta:=(cTipDoc="FAV" .OR. cTipDoc="TIK")
@@ -124,22 +124,32 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
     oBema:MsgErr("Archivo "+cFileLog+" está abierto",oBema:oMemo)
   ENDIF
 
-  oBema:oFile:=TFile():New(oBema:cFileLog)
+  // Sin archivo *.LOG
+  IF .F.
+    oBema:oFile:=TFile():New(oBema:cFileLog)
+  ENDIF
 
   IF !FILE(oBema:cFileDll)
      oBema:lErr :=.T.
-     oBema:oFile:AppStr("No se Encuenta Archivo "+oBema:cFileDll)
+     IF ValType(oBema:oFile)="O"
+        oBema:oFile:AppStr("No se Encuenta Archivo "+oBema:cFileDll)
+     ELSE
+        MsgMemo(oBema:cFileDll+" no Encontrado" )
+     ENDIF
      BEMA_END()
      BEMA_CLOSE()
      RETURN .F.
   ENDIF
 
-  oDp:nBemaDLL:= LoadLibrary(oBema:cFileDll)
+  DEFAULT oDp:nBemaDLL:= LoadLibrary(oBema:cFileDll)
+
   oBema:hDll  :=oDp:nBemaDLL
 
-  IF Empty(oDp:nBemaDLL)
-    FreeLibrary(oDp:nBemaDll)
-  ENDIF
+  SysRefresh(.T.)
+
+  // IF Empty(oDp:nBemaDLL)
+  //   FreeLibrary(oDp:nBemaDll)
+  // ENDIF
 
 //  ? BmPrendida(),"BmPrendida()"
 
@@ -150,30 +160,43 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
 
      oBema:oFile   :=TFile():New(oBema:cFileLog)
 
+     lCmdRun:=.F.
+
      cError:=BEMA_INI()
      lResp :=NIL
 
-     IF Empty(cError) .AND. "Z"$cCmd
+     // 21/09/2024
+     IF Empty(cError) .AND. "LEETXT"$cCmd
+       BEMA_LEETXT()          // 9/9/2024 lectura del total ZETA
+       SysRefresh(.T.)
+       oDp:cZeta:=BEMA_LEEZETA() // Ultimo Zeta
+       lCmdRun:=.T.
+     ENDIF
+
+     IF Empty(cError) .AND. "Z"$cCmd .AND. !lCmdRun
        lResp:=BEMA_ZETA()
+       oDp:cZeta:=BEMA_LEEZETA()
+       BEMA_LEETXT() // 9/9/2024 lectura del total ZETA
        lCmdRun:=.T.
      ENDIF
 
-     IF Empty(cError) .AND. "X"$cCmd
-       lResp:=BEMA_X()
+     IF Empty(cError) .AND. "X"$cCmd .AND. !lCmdRun
+       // BEMA_LEETXT() // 9/9/2024 lectura del total ZETA
+       lResp:=BEMA_X()  // 13/09/2024 Incidencia cuando ejecuta el Z y luego el reporte X
        lCmdRun:=.T.
      ENDIF
 
-     IF Empty(cError) .AND. "FAV"$cCmd
+     IF Empty(cError) .AND. "FAV"$cCmd .AND. !lCmdRun
        lResp:=BEMA_FAV()
        lCmdRun:=.T.
      ENDIF
 
-     IF Empty(cError) .AND. "CRE"$cCmd
+     IF Empty(cError) .AND. "CRE"$cCmd .AND. !lCmdRun
        lResp:=BEMA_CRE()
        lCmdRun:=.T.
      ENDIF
 
-     IF Empty(cError) .AND. "TOTAL"$cCmd
+     IF Empty(cError) .AND. "TOTAL"$cCmd .AND. !lCmdRun
        lResp:=BEMA_TOTAL()
        lCmdRun:=.T.
      ENDIF
@@ -195,11 +218,13 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
   // nRet:=BEMA_INI() // Inicio 
   cError:=BEMA_INI()
 
-  oBema:oFile:=TFile():New(oBema:cFileLog)
+  IF .F.
+    oBema:oFile:=TFile():New(oBema:cFileLog)
+  ENDIF
 
   IF !Empty(cError)
 
-    IF oDp:lImpFisModVal
+    IF oDp:lImpFisModVal .AND. ValType(oBema:oFile)="O"
 
       oBema:oFile:AppStr("Error Inicializando Bematech"+CRLF)
 
@@ -216,8 +241,10 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
 
 
 // ? cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue,"cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue"
-
-  oBema:oFile:AppStr("SUC="+cCodSuc+",TIP="+cTipDoc+",#"+cNumero+CRLF)
+  
+  IF ValType(oBema:oFile)="O"
+    oBema:oFile:AppStr("SUC="+cCodSuc+",TIP="+cTipDoc+",#"+cNumero+CRLF)
+  ENDIF
 
   nDivisa:=0
 
@@ -233,7 +260,10 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
 
      cNomDoc:=ALLTRIM(SQLGET("DPTIPDOCCLI","TDC_DESCRI","TDC_TIPO"+GetWhere("=",cTipDoc)))
      oBema:cError:="Documento no tiene Productos"
-     oBema:oFile:AppStr(oBema:cError+CRLF)
+
+     IF ValType(oBema:oFile)="O"
+        oBema:oFile:AppStr(oBema:cError+CRLF)
+     ENDIF
 
      oTable:End()
      BEMA_END()
@@ -254,7 +284,10 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
      // !oDp:lImpFisRegAud
      cNomDoc:=ALLTRIM(SQLGET("DPTIPDOCCLI","TDC_DESCRI","TDC_TIPO"+GetWhere("=",cTipDoc)))
      oBema:cError:="Documento fiscal fue Impreso"
-     oBema:oFile:AppStr(oBema:cError+CRLF)
+
+     IF ValType(oBema:oFile)="O"
+        oBema:oFile:AppStr(oBema:cError+CRLF)
+     ENDIF
 
      MsgMemo(cNomDoc+CRLF+cTipDoc+"-"+cNumero,oBema:cError)
 
@@ -451,7 +484,7 @@ FUNCTION BemaError(cError)
 
    SQLUPDATE("DPDOCCLI","DOC_IMPRES",.F.,cWhere)
 
-   IF oDp:lImpFisModVal
+   IF oDp:lImpFisModVal .AND. ValType(oBema:oFile)="O"
       oBema:oFile:AppStr("Error en Impresión, Es necesario Reimprimir el Ticket",cError+CRLF)
    ELSE
       MensajeErr("Error en Impresión, Es necesario Reimprimir el Ticket",cError)
@@ -492,7 +525,8 @@ FUNCTION BEMA_CLOSE()
 
   ENDIF
 
-  
+// ? oBema:lError,"oBema:lError",lSave,"lSave"
+ 
   IF oBema:lError .OR. oDp:lImpFisRegAud
      lSave:=.T.
   ENDIF
@@ -526,9 +560,9 @@ FUNCTION BEMA_CLOSE()
 
   ELSE
 
-    cMemo   :=MemoRead(oBema:cFileLog)+CRLF+oBema:cSql
+    // cMemo   :=MemoRead(oBema:cFileLog)+CRLF+oBema:cSql
     cFileLog:="bematech\"+cFileNoExt(oBema:cFileLog)
-    dpwrite(cFileLog,cMemo)
+    // 20/08/2024 dpwrite(cFileLog,cMemo)
 
   ENDIF
 
@@ -559,9 +593,14 @@ FUNCTION BMSERIAL()
      uResult := CallDLL( cFarProc,@cSerial)
    ENDIF
 
+   cSerial      :=STRTRAN(cSerial,CHR(0),"") // CHR(0) Genera Rechazo SQL
    oBema:cSerial:=cSerial
-   oBema:oFile:AppStr(cFunc+"()"+CRLF+"cSerial="+CTOO(cSerial,"C")+CRLF+;
-                      ",nResult= "+CTOO(uResult,"C")+CRLF)
+   oDp:cSerialIF:=cSerial
+
+   IF ValType(oBema:oFile)="O"
+     oBema:oFile:AppStr(cFunc+"()"+CRLF+"cSerial="+CTOO(cSerial,"C")+CRLF+;
+                        ",nResult= "+CTOO(uResult,"C")+CRLF)
+   ENDIF
 
 RETURN .T.
 
@@ -579,8 +618,10 @@ FUNCTION BmAbreCupom(cNombCli)
     uResult := CallDLL( cFarProc,cNombCli)
   ENDIF
 
-  oBema:oFile:AppStr(cFunc+"(cNombCli)"+CRLF+",cNombCli->"+CTOO(cNombCli,"C")+CRLF+;
-                     ",nResult= "+CTOO(uResult,"C")+CRLF)
+  IF ValType(oBema:oFile)="O"
+    oBema:oFile:AppStr(cFunc+"(cNombCli)"+CRLF+",cNombCli->"+CTOO(cNombCli,"C")+CRLF+;
+                       ",nResult= "+CTOO(uResult,"C")+CRLF)
+  ENDIF
 
 RETURN uResult
 
@@ -597,7 +638,9 @@ FUNCTION BMPRENDIDA()
 
   BEMA_ERROR(nRet,.T.)
 
-  oBema:oFile:AppStr(cFunc+"()"+CRLF+" nResult="      +CTOO(uResult  ,"C")+CRLF )
+  IF ValType(oBema:oFile)="O"
+    oBema:oFile:AppStr(cFunc+"()"+CRLF+" nResult="      +CTOO(uResult  ,"C")+CRLF )
+  ENDIF
 
 RETURN uResult
 
@@ -615,18 +658,21 @@ FUNCTION BMABREDEV( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )
 
   ENDIF
 
-  oBema:oFile:AppStr(cFunc+"( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )"+CRLF+;
-                     "cNombre->"+CTOO(cNombre,"C")+","+CRLF+;
-                     "cSerie ->"+CTOO(cSerie ,"C")+","+CRLF+;
-                     "cRif   ->"+CTOO(cRif   ,"C")+","+CRLF+;
-                     "cDias  ->"+CTOO(cDias  ,"C")+","+CRLF+;
-                     "cMes   ->"+CTOO(cMes   ,"C")+","+CRLF+;
-                     "cAno   ->"+CTOO(cAno   ,"C")+","+CRLF+;
-                     "cHora  ->"+CTOO(cHora  ,"C")+","+CRLF+;
-                     "cMin   ->"+CTOO(cMin   ,"C")+","+CRLF+;
-                     "cSeg   ->"+CTOO(cSeg   ,"C")+","+CRLF+;
-                     "cCu    ->"+CTOO(cCu    ,"C")+","+CRLF+;
-                     "nResult=" +CTOO(uResult,"C")+CRLF)
+  IF ValType(oBema:oFile)="O"
+
+    oBema:oFile:AppStr(cFunc+"( cNombre,cSerie,cRif,cDias,cMes,cAno,cHora,cMin,cSeg,cCu )"+CRLF+;
+                       "cNombre->"+CTOO(cNombre,"C")+","+CRLF+;
+                       "cSerie ->"+CTOO(cSerie ,"C")+","+CRLF+;
+                       "cRif   ->"+CTOO(cRif   ,"C")+","+CRLF+;
+                       "cDias  ->"+CTOO(cDias  ,"C")+","+CRLF+;
+                       "cMes   ->"+CTOO(cMes   ,"C")+","+CRLF+;
+                       "cAno   ->"+CTOO(cAno   ,"C")+","+CRLF+;
+                       "cHora  ->"+CTOO(cHora  ,"C")+","+CRLF+;
+                       "cMin   ->"+CTOO(cMin   ,"C")+","+CRLF+;
+                       "cSeg   ->"+CTOO(cSeg   ,"C")+","+CRLF+;
+                       "cCu    ->"+CTOO(cCu    ,"C")+","+CRLF+;
+                       "nResult=" +CTOO(uResult,"C")+CRLF)
+  ENDIF
 
 RETURN uResult
 
@@ -640,17 +686,21 @@ FUNCTION BmVendItem( Codigo,Descricao,Aliquota,TpQte,Quantid,Decimal,ValUnit,TpD
      uResult := CallDLL( cFarProc,Codigo,Descricao,Aliquota,TpQte,Quantid,Decimal,ValUnit,TpDesc,ValDesc )
   ENDIF
 
-  oBema:oFile:AppStr(cFunc+"( Codigo,Descricao,Aliquota,TpQte,Quantid,Decimal,ValUnit,TpDesc,ValDesc )"+CRLF+;
-                     " Codigo->"   +CTOO(Codigo,   "C")+","+CRLF+;
-                     " Descricao->"+CTOO(Descricao,"C")+","+CRLF+;
-                     " Aliquota-> "+CTOO(Aliquota ,"C")+","+CRLF+;
-                     " TpQte->  "  +CTOO(TpQte    ,"C")+","+CRLF+;
-                     " Quantid->"  +CTOO(Quantid  ,"C")+","+CRLF+;
-                     " Decimal->"  +CTOO(Decimal  ,"C")+","+CRLF+;
-                     " ValUnit->"  +CTOO(ValUnit  ,"C")+","+CRLF+;
-                     " TpDesc-> "  +CTOO(TpDesc   ,"C")+","+CRLF+;
-                     " ValDesc->"  +CTOO(ValDesc  ,"C")+","+CRLF+;
-                     " nResult="   +CTOO(uResult  ,"C")+CRLF)
+  IF ValType(oBema:oFile)="O"
+
+   oBema:oFile:AppStr(cFunc+"( Codigo,Descricao,Aliquota,TpQte,Quantid,Decimal,ValUnit,TpDesc,ValDesc )"+CRLF+;
+                      " Codigo->"   +CTOO(Codigo,   "C")+","+CRLF+;
+                      " Descricao->"+CTOO(Descricao,"C")+","+CRLF+;
+                      " Aliquota-> "+CTOO(Aliquota ,"C")+","+CRLF+;
+                      " TpQte->  "  +CTOO(TpQte    ,"C")+","+CRLF+;
+                      " Quantid->"  +CTOO(Quantid  ,"C")+","+CRLF+;
+                      " Decimal->"  +CTOO(Decimal  ,"C")+","+CRLF+;
+                      " ValUnit->"  +CTOO(ValUnit  ,"C")+","+CRLF+;
+                      " TpDesc-> "  +CTOO(TpDesc   ,"C")+","+CRLF+;
+                      " ValDesc->"  +CTOO(ValDesc  ,"C")+","+CRLF+;
+                      " nResult="   +CTOO(uResult  ,"C")+CRLF)
+
+  ENDIF
 
 RETURN uResult
 
@@ -668,9 +718,12 @@ FUNCTION BmIniFecCupIGTF( cPagoDolar )
     uResult := CallDLL( cFarProc,cPagoDolar )
  ENDIF
 
- oBema:oFile:AppStr(cFunc+"( cPagoDolar )"+CRLF+;
-                     " cPagoDolar->"   +CTOO(cPagoDolar,"C")+","+CRLF+;
-                     " nResult="       +CTOO(uResult   ,"C")+CRLF)
+ IF ValType(oBema:oFile)="O"
+
+   oBema:oFile:AppStr(cFunc+"( cPagoDolar )"+CRLF+;
+                      " cPagoDolar->"   +CTOO(cPagoDolar,"C")+","+CRLF+;
+                      " nResult="       +CTOO(uResult   ,"C")+CRLF)
+ ENDIF
 
 RETURN uResult
 
@@ -687,11 +740,14 @@ FUNCTION BmIniFecCup( Acrescimo,TipAcresc,ValAcresc )
     uResult := CallDLL( cFarProc,Acrescimo,TipAcresc,ValAcresc )
  ENDIF
 
- oBema:oFile:AppStr(cFunc+"(Acrescimo,TipAcresc,ValAcresc )"+CRLF+;
-                    " Acrescimo->"+CTOO(Acrescimo,"C")+","+CRLF+;
-                    " TipAcresc->"+CTOO(TipAcresc,"C")+","+CRLF+;
-                    " ValAcresc->"+CTOO(ValAcresc,"C")+","+CRLF+;
-                    " nResult="   +CTOO(uResult  ,"C")+CRLF)
+ IF ValType(oBema:oFile)="O"
+
+   oBema:oFile:AppStr(cFunc+"(Acrescimo,TipAcresc,ValAcresc )"+CRLF+;
+                      " Acrescimo->"+CTOO(Acrescimo,"C")+","+CRLF+;
+                      " TipAcresc->"+CTOO(TipAcresc,"C")+","+CRLF+;
+                      " ValAcresc->"+CTOO(ValAcresc,"C")+","+CRLF+;
+                      " nResult="   +CTOO(uResult  ,"C")+CRLF)
+ ENDIF
 
 RETURN uResult
 
@@ -708,10 +764,13 @@ FUNCTION BmFormasPag( FormaPgto,ValorPago )
      uResult := CallDLL( cFarProc,FormaPgto,ValorPago )
   ENDIF
 
-  oBema:oFile:AppStr(cFunc+"( FormaPgto,ValorPago )"+CRLF+;
-                     " FormaPgto->"   +CTOO(FormaPgto,"C")+","+CRLF+;
-                     " ValorPago->"   +CTOO(ValorPago,"C")+","+CRLF+;
-                     " nResult="      +CTOO(uResult  ,"C")+CRLF)
+  IF ValType(oBema:oFile)="O"
+
+    oBema:oFile:AppStr(cFunc+"( FormaPgto,ValorPago )"+CRLF+;
+                       " FormaPgto->"   +CTOO(FormaPgto,"C")+","+CRLF+;
+                       " ValorPago->"   +CTOO(ValorPago,"C")+","+CRLF+;
+                       " nResult="      +CTOO(uResult  ,"C")+CRLF)
+  ENDIF
 
 RETURN uResult
 
@@ -725,7 +784,9 @@ FUNCTION BmTerFecCup( Mensagem )
      uResult := CallDLL( cFarProc,Mensagem )
   ENDIF
 
-  oBema:oFile:AppStr(cFunc+"("+CTOO(Mensagem,"C")+")"+CRLF+" nResult="      +CTOO(uResult  ,"C")+CRLF )
+  IF ValType(oBema:oFile)="O"
+    oBema:oFile:AppStr(cFunc+"("+CTOO(Mensagem,"C")+")"+CRLF+" nResult="      +CTOO(uResult  ,"C")+CRLF )
+  ENDIF
 
 RETURN uResult
 
@@ -780,7 +841,9 @@ FUNCTION BmPrintLig()
 
   ELSE
 
-    oBema:oFile:AppStr("Modo Validación Activo "+CRLF)
+    IF ValType(oBema:oFile)="O"
+      oBema:oFile:AppStr("Modo Validación Activo "+CRLF)
+    ENDIF
 
   ENDIF
 
@@ -840,7 +903,9 @@ FUNCTION BEMA_ERROR(nRet,lShow)
 
    cError:="Error:"+CTOO(nRet,"C")+", "+cError
 
-   oBema:oFile:AppStr(cError+CRLF)
+   IF ValType(oBema:oFile)="O"
+     oBema:oFile:AppStr(cError+CRLF)
+   ENDIF
 
    IF lShow
 
@@ -941,10 +1006,13 @@ RETURN cError
 FUNCTION BEMA_END()
   LOCAL oFont
 
+/*
+  // 18/08/2024 ahora cierra en DPFIN
   IF oDp:nBemaDll<>NIL
      FreeLibrary(oDp:nBemaDll)
      oDp:nBemaDll:=NIL
   ENDIF
+*/
 
   IF ValType(oBema:oFile)="O"
      oBema:oFile:AppStr("BEMA_END()"+CRLF)
@@ -1065,7 +1133,9 @@ FUNCTION BEMA_ZETA(dT,Hs)
    DEFAULT dT:=DTOC(DATE()),;
            Hs:=TIME()
 
-   IF !oDp:lImpFisModVal
+// ? "QUITAR .F."
+
+   IF !oDp:lImpFisModVal 
      cFarProc:=GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7,9 ,9 ) 
      uResult :=CallDLL(cFarProc,dT,Hs)
    ENDIF
@@ -1078,6 +1148,59 @@ FUNCTION BEMA_ZETA(dT,Hs)
   SysRefresh(.T.)
 
 RETURN uResult
+
+/*
+// Realiza lectura del reporte Z
+*/
+FUNCTION BEMA_LEEZETA()
+  LOCAL cFunc  :="Bematech_FI_NumeroReducciones"
+  LOCAL cZeta  :="0000" 
+  LOCAL cFarProc,uResult
+  LOCAL cDataMFD:= SPACE(1278) 
+
+  CursorWait()
+
+  IF !oDp:lImpFisModVal
+
+     cFarProc:=GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7,9) 
+     uResult :=CallDLL(cFarProc,@cZeta)
+
+   ENDIF
+
+   IF ValType(oBema:oFile)="O"
+     oBema:oFile:AppStr(cFunc+"(@cZeta)"+cZeta+",Result->"+CTOO(uResult,"C")+CRLF)
+   ENDIF
+
+   oDp:cZeta:=cZeta
+
+   SysRefresh(.T.)
+
+RETURN cZeta
+
+/*
+// Realiza lectura del total Z
+// genera archivo= retorno.txt
+*/
+FUNCTION BEMA_LEETXT()
+  LOCAL cFunc   :="Bematech_FI_LecturaXSerial"
+  LOCAL cFarProc,uResult
+
+  IF !oDp:lImpFisModVal
+
+     cFarProc:=GetProcAddress(oDp:nBemaDLL,cFunc,.T.,7) // ,9) 
+     uResult :=CallDLL(cFarProc) // ,@cTotalZ)
+
+   ENDIF
+
+   IF ValType(oBema:oFile)="O"
+     oBema:oFile:AppStr(cFunc+",Result->"+CTOO(uResult,"C")+CRLF)
+   ENDIF
+
+//   SysRefresh(.T.)
+
+RETURN NIL
+
+
 
 /*
 // Resetear Impresora
@@ -1124,9 +1247,7 @@ RETURN uResult
 */
 FUNCTION BEMA_FAV()
   LOCAL cNumFav:=SPACE(06), cFarProc,uResult
-  LOCAL cFunc  :="Bematech_FI_NumeroComprobanteFiscal" 
-
-  cFunc:="Bematech_FI_ContadorCuponFiscalMFD"
+  LOCAL cFunc  :="Bematech_FI_ContadorCuponFiscalMFD"
 
   oDp:cBemaFAV:=0
 
@@ -1388,9 +1509,13 @@ FUNCTION BmVerEstado(ACX ,ST1,ST2 )
      oBema:ST2:=ST2
    ENDIF
 
-   oBema:oFile:AppStr("BmVerEstado(ACX->"+CTOO(ACX,"C")+;
-                                        ",ST1->"+CTOO(ST1,"C")+;
-                                        ",ST2->"+CTOO(ST2,"C")+")nResult="+CTOO(uResult,"C")+CRLF)
+   IF ValType(oBema:oFile)="O"
+
+     oBema:oFile:AppStr("BmVerEstado(ACX->"+CTOO(ACX,"C")+;
+                                          ",ST1->"+CTOO(ST1,"C")+;
+                                          ",ST2->"+CTOO(ST2,"C")+")nResult="+CTOO(uResult,"C")+CRLF)
+   ENDIF
+
 RETURN uResult
 
 

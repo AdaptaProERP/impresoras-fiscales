@@ -8,26 +8,26 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(cCmd,cOption,uValue,lShow,lMsgErr,lBrowse)
+PROCE MAIN(cCmd,cOption,cLetra,lShow,lMsgErr,lBrowse)
    LOCAL cResp:=NIL,oTable,nNumero,cMemoLog:="",cTipo:=""
-   LOCAL lRunCmd:=.F.,oMemo
+   LOCAL lRunCmd:=.F.,oMemo,cFileLog
 
    DEFAULT cCmd   :="Z",;
            cOption:="Reporte Z",;
            lShow  :=.F.,;
-           uValue :=NIL,;
+           cLetra :=oDp:cImpLetra,;
            lMsgErr:=.T.,;
            lBrowse:=.F.
 
 
-? cCmd,"<-cCmd",cOption,uValue,lShow,lMsgErr,lBrowse,"cCmd,cOption,uValue,lShow,lMsgErr,lBrowse"
+   // ? cCmd,"<-cCmd",cOption,cLetra,lShow,lMsgErr,lBrowse,"cCmd,cOption,cLetra,lShow,lMsgErr,lBrowse"
 
    cFileLog:="TEMP\bematech_"+cCmd+".LOG"
 
    IF cCmd=="Z" .OR. "Z"$UPPER(cCmd) .OR. "Z"$UPPER(cOption)
       cTipo  :="REPZ"
       lRunCmd:=.T.
-      cResp  :=EJECUTAR("DLL_BEMATECH_Z")
+      cResp  :=EJECUTAR("DLL_BEMATECH_Z",cLetra,.T.)
    ENDIF
 
    IF (cCmd=="X" .OR. "X"$UPPER(cCmd) .OR. "X"$UPPER(cOption)) .AND. !lRunCmd
@@ -35,6 +35,13 @@ PROCE MAIN(cCmd,cOption,uValue,lShow,lMsgErr,lBrowse)
       cTipo  :="REPX"
       lRunCmd:=.T.
    ENDIF
+
+   IF (cCmd=="X" .OR. "LEETXT"$UPPER(cOption)) .AND. !lRunCmd
+      cResp  :=EJECUTAR("DLL_BEMATECH_LEETXT")
+      cTipo  :="TXT"
+      lRunCmd:=.T.
+   ENDIF
+
 
    /*
    // Ejecuta comando 
@@ -44,9 +51,11 @@ PROCE MAIN(cCmd,cOption,uValue,lShow,lMsgErr,lBrowse)
      EJECUTAR("DLL_BEMATECH",NIL,NIL,NIL,lMsgErr,lShow,lBrowse,cCmd,oMemo)
    ENDIF
 
+   
    IF lRunCmd
 
-     cMemoLog:=MEMOREAD(cFileLog)
+     //  cMemoLog:=MEMOREAD(cFileLog)
+     SysRefresh(.T.)
 
      nNumero:=SQLINCREMENTAL("DPAUDITOR","AUD_NUMERO","AUD_SCLAVE"+GetWhere("=","DLL_BEMATECH"))
      oTable:=OpenTable("SELECT * FROM DPAUDITOR",.F.)  
