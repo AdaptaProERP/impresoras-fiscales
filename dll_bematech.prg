@@ -160,43 +160,36 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,lMsgErr,lShow,lBrowse,cCmd,oMemo,uValue)
 
      oBema:oFile   :=TFile():New(oBema:cFileLog)
 
-     lCmdRun:=.F.
-
      cError:=BEMA_INI()
      lResp :=NIL
 
-     // 21/09/2024
-     IF Empty(cError) .AND. "LEETXT"$cCmd
-       BEMA_LEETXT()          // 9/9/2024 lectura del total ZETA
-       SysRefresh(.T.)
-       oDp:cZeta:=BEMA_LEEZETA() // Ultimo Zeta
-       lCmdRun:=.T.
-     ENDIF
-
-     IF Empty(cError) .AND. "Z"$cCmd .AND. !lCmdRun
+     IF Empty(cError) .AND. "Z"$cCmd
        lResp:=BEMA_ZETA()
        oDp:cZeta:=BEMA_LEEZETA()
-       BEMA_LEETXT() // 9/9/2024 lectura del total ZETA
+       BEMA_TOTALZETA() // 9/9/2024 lectura del total ZETA
        lCmdRun:=.T.
      ENDIF
 
-     IF Empty(cError) .AND. "X"$cCmd .AND. !lCmdRun
-       // BEMA_LEETXT() // 9/9/2024 lectura del total ZETA
+     IF Empty(cError) .AND. "X"$cCmd
+       BEMA_TOTALZETA() // 9/9/2024 lectura del total ZETA
        lResp:=BEMA_X()  // 13/09/2024 Incidencia cuando ejecuta el Z y luego el reporte X
        lCmdRun:=.T.
      ENDIF
 
-     IF Empty(cError) .AND. "FAV"$cCmd .AND. !lCmdRun
+     IF Empty(cError) .AND. "FAV"$cCmd
+
+// ? BEMA_LEEZETA(),"zeta"
+
        lResp:=BEMA_FAV()
        lCmdRun:=.T.
      ENDIF
 
-     IF Empty(cError) .AND. "CRE"$cCmd .AND. !lCmdRun
+     IF Empty(cError) .AND. "CRE"$cCmd
        lResp:=BEMA_CRE()
        lCmdRun:=.T.
      ENDIF
 
-     IF Empty(cError) .AND. "TOTAL"$cCmd .AND. !lCmdRun
+     IF Empty(cError) .AND. "TOTAL"$cCmd
        lResp:=BEMA_TOTAL()
        lCmdRun:=.T.
      ENDIF
@@ -525,8 +518,7 @@ FUNCTION BEMA_CLOSE()
 
   ENDIF
 
-// ? oBema:lError,"oBema:lError",lSave,"lSave"
- 
+  
   IF oBema:lError .OR. oDp:lImpFisRegAud
      lSave:=.T.
   ENDIF
@@ -1156,9 +1148,7 @@ FUNCTION BEMA_LEEZETA()
   LOCAL cFunc  :="Bematech_FI_NumeroReducciones"
   LOCAL cZeta  :="0000" 
   LOCAL cFarProc,uResult
-  LOCAL cDataMFD:= SPACE(1278) 
-
-  CursorWait()
+  LOCAL cDataMFD:= SPACEpace(1278) 
 
   IF !oDp:lImpFisModVal
 
@@ -1179,9 +1169,9 @@ RETURN cZeta
 
 /*
 // Realiza lectura del total Z
-// genera archivo= retorno.txt
 */
-FUNCTION BEMA_LEETXT()
+FUNCTION BEMA_TOTALZETA()
+  //LOCAL cFunc   :="Bematech_FI_DatosUltimaReduccion"
   LOCAL cFunc   :="Bematech_FI_LecturaXSerial"
   LOCAL cFarProc,uResult
 
@@ -1196,7 +1186,7 @@ FUNCTION BEMA_LEETXT()
      oBema:oFile:AppStr(cFunc+",Result->"+CTOO(uResult,"C")+CRLF)
    ENDIF
 
-//   SysRefresh(.T.)
+   SysRefresh(.T.)
 
 RETURN NIL
 

@@ -8,27 +8,13 @@
 
 #INCLUDE "DPXBASE.CH"
 
-PROCE MAIN(cSerie,lTxt)
+PROCE MAIN(cSerie)
 
-   DEFAULT lTxt:=.T.
+   EJECUTAR("DPSERIEFISCALLOAD",NIL,.F.)
+   EJECUTAR("DLL_BEMATECH",NIL,NIL,NIL,NIL,.T.,NIL,"Z")
 
-   CursorWait()
-
-   IF !EJECUTAR("DPSERIEFISCALLOAD",NIL,.T.)
-      RETURN .F.
-   ENDIF
-
-   // Guardar el Registro Antes del Zeta (Luego del Z, la memoria fiscal se resetea)
-   IF lTxt
-     EJECUTAR("DLL_BEMATECH_LEETXT",.F.) // 
-     EJECUTAR("DPDOCCLIZFF",cSerie)
-   ENDIF
-
- //  EJECUTAR("DLL_BEMATECH",NIL,NIL,NIL,NIL,.T.,NIL,"Z")
-
-   IF lTxt
-     EJECUTAR("DLL_BEMATECH_VIEWZ",cSerie)
-   ENDIF
+   EJECUTAR("DPDOCCLIZIF",cSerie)
+   EJECUTAR("DLL_BEMATECH_VIEWZ",cSerie)
 
 RETURN .T.
 // EOF

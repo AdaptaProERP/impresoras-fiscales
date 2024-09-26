@@ -9,11 +9,10 @@
 #INCLUDE "DPXBASE.CH"
 
 PROCE MAIN(cCodigo,cWhere,cCodSuc,nPeriodo,dDesde,dHasta,cTitle,cTableA)
-   LOCAL aData,aFechas,cFileMem:="USER\BRPLANTILLADOC.MEM",V_nPeriodo:=4,cCodPar,nPorIva,nCol:=2
+   LOCAL aData,aFechas,cFileMem:="USER\BRPLANTILLADOC.MEM",V_nPeriodo:=4,cCodPar
    LOCAL V_dDesde:=CTOD(""),V_dHasta:=CTOD("")
    LOCAL cServer:=oDp:cRunServer,aVars:={}
    LOCAL lConectar:=.F.,cSql
-   LOCAL aTipIva:=ASQL("SELECT TIP_CODIGO,0 FROM DPIVATIP "),I,oDb:=OpenOdbc(oDp:cDsnData),lCrear:=.F.
 
    oDp:cRunServer:=NIL
 
@@ -38,24 +37,6 @@ PROCE MAIN(cCodigo,cWhere,cCodSuc,nPeriodo,dDesde,dHasta,cTitle,cTableA)
       oDp:hDLLRtf := LoadLibrary( "Riched20.dll" )
    ENDIF
 
-   IF !EJECUTAR("DBISTABLE",oDb,"VIEW_DOCCLI_CTA_IVA"             ,.F.)
-      EJECUTAR("DPTIPIVATOVISTA")
-   ENDIF
-
-   // Validará Campo por Campo
-   FOR I=1 TO LEN(aTipIva)
-  
-      IF !EJECUTAR("ISFIELDMYSQL",oDb,"VIEW_DOCCLI_CTA_IVA","IVD_MTO"+aTipIva[I,1],.F.)
-         lCrear:=.T.
-      ENDIF
-
-   NEXT I
-
-   IF lCrear
-      EJECUTAR("DPTIPIVATOVISTA")
-   ENDIF
-
-
    cTitle:="Reporte Z en formato Digital para Impresora Bematech " +IF(Empty(cTitle),"",cTitle)
 
    oDp:oFrm:=NIL
@@ -78,17 +59,7 @@ PROCE MAIN(cCodigo,cWhere,cCodSuc,nPeriodo,dDesde,dHasta,cTitle,cTableA)
 
    ENDIF
 
-   aTipIva:=ASQL("SELECT TIP_CODIGO,0 FROM DPIVATIP WHERE TIP_VENTA=1 AND TIP_ACTIVO=1 ")
-
-   FOR I=1 TO LEN(aTipIva)
-
-     nPorIva:=EJECUTAR("IVACAL",aTipIva[I,1],nCol,dHasta)
-
-     aTipIva[I,2]:=nPorIva
-
-   NEXT I
-
-   aData:=LEERDATA(HACERWHERE(dDesde,dHasta,cWhere),NIL,cServer,aTipIva)
+   aData:=LEERDATA(HACERWHERE(dDesde,dHasta,cWhere),NIL,cServer,cTableA)
 
    cSql :=oDp:cWhere
 
@@ -108,7 +79,6 @@ FUNCTION ViewData(aData,cTitle,cWhere_)
    LOCAL oFont,oFontB,oFontC
    LOCAL aPeriodos:=ACLONE(oDp:aPeriodos)
    LOCAL aCoors:=GetCoors( GetDesktopWindow() )
-   LOCAL cMacro:=""
 
    DEFINE FONT oFont  NAME "Tahoma"      SIZE 0, -12 
    DEFINE FONT oFontB NAME "Tahoma"      SIZE 0, -12 
@@ -144,15 +114,13 @@ FUNCTION ViewData(aData,cTitle,cWhere_)
    oBemaViewZ:cCodigo  :=cCodigo
    oBemaViewZ:oMemo    :=NIL
    oBemaViewZ:cMemo    :=""
-//   oBemaViewZ:cTableA  :=cTableA
-   oBemaViewZ:aTipIva  :=aTipIva
+   oBemaViewZ:cTableA  :=cTableA
 
    oBemaViewZ:oBrw:=TXBrowse():New( IF(oBemaViewZ:lTmdi,oBemaViewZ:oWnd,oBemaViewZ:oDlg ))
    oBemaViewZ:oBrw:SetArray( aData, .F. )
    oBemaViewZ:oBrw:SetFont(oFont)
-   oBemaViewZ:oBrw:oLbx        :=oBemaViewZ
 
-   oBemaViewZ:oBrw:lFooter     := .T.
+   oBemaViewZ:oBrw:lFooter     := .F.
    oBemaViewZ:oBrw:lHScroll    := .T.
    oBemaViewZ:oBrw:nHeaderLines:= 2
    oBemaViewZ:oBrw:nDataLines  := 1
@@ -166,61 +134,57 @@ FUNCTION ViewData(aData,cTitle,cWhere_)
    AEVAL(oBemaViewZ:oBrw:aCols,{|oCol|oCol:oHeaderFont:=oFont})
 
    oCol:=oBemaViewZ:oBrw:aCols[1]
-   oCol:cHeader      :='#Serie'
+   oCol:cHeader      :='#Reg'
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 50
+   oCol:nWidth       := 70
 
    oCol:=oBemaViewZ:oBrw:aCols[2]
    oCol:cHeader      :='#Zeta'
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 50
+   oCol:nWidth       := 60
 
    oCol:=oBemaViewZ:oBrw:aCols[3]
-   oCol:cHeader      :='#Reg'
+   oCol:cHeader      :='#Serie'
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 50
+   oCol:nWidth       := 60
 
-   oCol:=oBemaViewZ:oBrw:aCols[04]
-   oCol:cHeader      :='Fecha'
-   oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 70
-
-   oCol:=oBemaViewZ:oBrw:aCols[5]
-   oCol:cHeader      :='Primera'+CRLF+"Factura"
-   oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 80
-
-   oCol:=oBemaViewZ:oBrw:aCols[6]
+   oCol:=oBemaViewZ:oBrw:aCols[4]
    oCol:cHeader      :='Ultima'+CRLF+"Factura"
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 80
-
-   FOR I=1 TO LEN(oBemaViewZ:aTipIva)
-
-      oCol:=oBemaViewZ:oBrw:aCols[I+6]
-      oCol:cHeader      :='Total'+CRLF+oBemaViewZ:aTipIva[I,1]+" "+LSTR(oBemaViewZ:aTipIva[I,2])
-
-      oCol:nDataStrAlign:= AL_RIGHT 
-      oCol:nHeadStrAlign:= AL_RIGHT 
-      oCol:nFootStrAlign:= AL_RIGHT 
-      oCol:cEditPicture :='999,999,999,999.99'
-
-      cMacro:="{|nMonto|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,"+LSTR(I+6)+"],FDP(nMonto,'999,999,999.99')}"
-
-      oCol:bStrData:=BLOQUECOD(cMacro)
+   oCol:nWidth       := 60
 
 
-   NEXT I
-
-   oCol:=ATAIL(oBemaViewZ:oBrw:aCols)
-   oCol:cHeader      :='#'+CRLF+"Memo"
-
-IF .F.
-
-   oCol:=oBemaViewZ:oBrw:aCols[7]
+   oCol:=oBemaViewZ:oBrw:aCols[5]
    oCol:cHeader      :="Base"+CRLF+'Imponible'
    oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
+   oCol:nWidth       := 120
+   oCol:nDataStrAlign:= AL_RIGHT 
+   oCol:nHeadStrAlign:= AL_RIGHT 
+   oCol:nFootStrAlign:= AL_RIGHT 
+   oCol:cEditPicture :='9,999,999,999,999,999.99'
+   oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,5],; 
+                                oCol   := oBemaViewZ:oBrw:aCols[5],;
+                                FDP(nMonto,oCol:cEditPicture)}
+   oCol:cFooter      :=FDP(aTotal[5],oCol:cEditPicture)
+
+
+   oCol:=oBemaViewZ:oBrw:aCols[6]
+   oCol:cHeader      :="Monto"+CRLF+'Exento'
+   oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
+   oCol:nWidth       := 120
+   oCol:nDataStrAlign:= AL_RIGHT 
+   oCol:nHeadStrAlign:= AL_RIGHT 
+   oCol:nFootStrAlign:= AL_RIGHT 
+   oCol:cEditPicture :='9,999,999,999,999,999.99'
+   oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,6],; 
+                                oCol   := oBemaViewZ:oBrw:aCols[6],;
+                                FDP(nMonto,oCol:cEditPicture)}
+   oCol:cFooter      :=FDP(aTotal[6],oCol:cEditPicture)
+
+   oCol:=oBemaViewZ:oBrw:aCols[7]
+   oCol:cHeader      :="Monto"+CRLF+'IVA'
+   oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
+   oCol:nWidth       := 120
    oCol:nDataStrAlign:= AL_RIGHT 
    oCol:nHeadStrAlign:= AL_RIGHT 
    oCol:nFootStrAlign:= AL_RIGHT 
@@ -232,9 +196,9 @@ IF .F.
 
 
    oCol:=oBemaViewZ:oBrw:aCols[8]
-   oCol:cHeader      :="Monto"+CRLF+'Exento'
+   oCol:cHeader      :="Monto"+CRLF+'Neto'
    oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
+   oCol:nWidth       := 120
    oCol:nDataStrAlign:= AL_RIGHT 
    oCol:nHeadStrAlign:= AL_RIGHT 
    oCol:nFootStrAlign:= AL_RIGHT 
@@ -244,150 +208,39 @@ IF .F.
                                 FDP(nMonto,oCol:cEditPicture)}
    oCol:cFooter      :=FDP(aTotal[8],oCol:cEditPicture)
 
+
    oCol:=oBemaViewZ:oBrw:aCols[9]
-   oCol:cHeader      :="Monto"+CRLF+'IVA'
+   oCol:cHeader      :="Monto"+CRLF+'IGTF'
    oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
+   oCol:nWidth       := 120
    oCol:nDataStrAlign:= AL_RIGHT 
    oCol:nHeadStrAlign:= AL_RIGHT 
    oCol:nFootStrAlign:= AL_RIGHT 
    oCol:cEditPicture :='9,999,999,999,999,999.99'
    oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,9],; 
-                                oCol   := oBemaViewZ:oBrw:aCols[9],;
+                                oCol  := oBemaViewZ:oBrw:aCols[9],;
                                 FDP(nMonto,oCol:cEditPicture)}
    oCol:cFooter      :=FDP(aTotal[9],oCol:cEditPicture)
 
 
    oCol:=oBemaViewZ:oBrw:aCols[10]
-   oCol:cHeader      :="Monto"+CRLF+'Neto'
-   oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
-   oCol:nDataStrAlign:= AL_RIGHT 
-   oCol:nHeadStrAlign:= AL_RIGHT 
-   oCol:nFootStrAlign:= AL_RIGHT 
-   oCol:cEditPicture :='9,999,999,999,999,999.99'
-   oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,10],; 
-                                oCol   := oBemaViewZ:oBrw:aCols[10],;
-                                FDP(nMonto,oCol:cEditPicture)}
-   oCol:cFooter      :=FDP(aTotal[10],oCol:cEditPicture)
-
+   oCol:cHeader      :='Fecha'
+   oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
+   oCol:nWidth       := 70
 
    oCol:=oBemaViewZ:oBrw:aCols[11]
-   oCol:cHeader      :="Monto"+CRLF+'IGTF'
-   oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
-   oCol:nDataStrAlign:= AL_RIGHT 
-   oCol:nHeadStrAlign:= AL_RIGHT 
-   oCol:nFootStrAlign:= AL_RIGHT 
-   oCol:cEditPicture :='9,999,999,999,999,999.99'
-   oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,11],; 
-                                oCol  := oBemaViewZ:oBrw:aCols[11],;
-                                FDP(nMonto,oCol:cEditPicture)}
-   oCol:cFooter      :=FDP(aTotal[11],oCol:cEditPicture)
-
-
-  
-   oCol:=oBemaViewZ:oBrw:aCols[12]
-   oCol:cHeader      :="ORG"
-   oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 40
-
-
-   oCol:=oBemaViewZ:oBrw:aCols[13]
-   oCol:cHeader      :='#Reg'+CRLF+"Ticket"
-   oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 50
-
-   oCol:=oBemaViewZ:oBrw:aCols[14]
-   oCol:cHeader      :='Cód.'+CRLF+"Suc"
-   oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 50
-
-   oCol:=oBemaViewZ:oBrw:aCols[15]
-   oCol:cHeader      :='#Dev.'+CRLF+"Desde"
-   oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 80
-
-   oCol:=oBemaViewZ:oBrw:aCols[16]
-   oCol:cHeader      :='#Dev.'+CRLF+"Hasta"
-   oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 80
-
-   oCol:=oBemaViewZ:oBrw:aCols[17]
-   oCol:cHeader      :="Monto"+CRLF+'Exento'
-   oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
-   oCol:nDataStrAlign:= AL_RIGHT 
-   oCol:nHeadStrAlign:= AL_RIGHT 
-   oCol:nFootStrAlign:= AL_RIGHT 
-   oCol:cEditPicture :='9,999,999,999,999,999.99'
-   oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,17],; 
-                                oCol   := oBemaViewZ:oBrw:aCols[17],;
-                                FDP(nMonto,oCol:cEditPicture)}
-   oCol:cFooter      :=FDP(aTotal[17],oCol:cEditPicture)
-
-
-   oCol:=oBemaViewZ:oBrw:aCols[18]
-   oCol:cHeader      :="Base"+CRLF+'Imponible'
-   oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
-   oCol:nDataStrAlign:= AL_RIGHT 
-   oCol:nHeadStrAlign:= AL_RIGHT 
-   oCol:nFootStrAlign:= AL_RIGHT 
-   oCol:cEditPicture :='9,999,999,999,999,999.99'
-   oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,18],; 
-                                oCol   := oBemaViewZ:oBrw:aCols[18],;
-                                FDP(nMonto,oCol:cEditPicture)}
-   oCol:cFooter      :=FDP(aTotal[18],oCol:cEditPicture)
-
-   oCol:=oBemaViewZ:oBrw:aCols[19]
-   oCol:cHeader      :="Monto"+CRLF+'IVA'
-   oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
-   oCol:nDataStrAlign:= AL_RIGHT 
-   oCol:nHeadStrAlign:= AL_RIGHT 
-   oCol:nFootStrAlign:= AL_RIGHT 
-   oCol:cEditPicture :='9,999,999,999,999,999.99'
-   oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,19],; 
-                                oCol   := oBemaViewZ:oBrw:aCols[19],;
-                                FDP(nMonto,oCol:cEditPicture)}
-   oCol:cFooter      :=FDP(aTotal[19],oCol:cEditPicture)
-
-
-// ZDF_MTOEXE,ZDF_BASE,ZDF_IVA,ZDF_NETO,ZDF_MTOIGT
-
-   oCol:=oBemaViewZ:oBrw:aCols[20]
-   oCol:cHeader      :="Monto"+CRLF+'Neto'
-   oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
-   oCol:nDataStrAlign:= AL_RIGHT 
-   oCol:nHeadStrAlign:= AL_RIGHT 
-   oCol:nFootStrAlign:= AL_RIGHT 
-   oCol:cEditPicture :='9,999,999,999,999,999.99'
-   oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,21],; 
-                                oCol   := oBemaViewZ:oBrw:aCols[21],;
-                                FDP(nMonto,oCol:cEditPicture)}
-   oCol:cFooter      :=FDP(aTotal[20],oCol:cEditPicture)
-
-   oCol:=oBemaViewZ:oBrw:aCols[21]
-   oCol:cHeader      :="Monto"+CRLF+'IGTF'
-   oCol:bLClickHeader := {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
-   oCol:nWidth       := 100
-   oCol:nDataStrAlign:= AL_RIGHT 
-   oCol:nHeadStrAlign:= AL_RIGHT 
-   oCol:nFootStrAlign:= AL_RIGHT 
-   oCol:cEditPicture :='9,999,999,999,999,999.99'
-   oCol:bStrData:={|nMonto,oCol|nMonto:= oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,21],; 
-                                oCol   := oBemaViewZ:oBrw:aCols[21],;
-                                FDP(nMonto,oCol:cEditPicture)}
-   oCol:cFooter      :=FDP(aTotal[21],oCol:cEditPicture)
-
-   oCol:=oBemaViewZ:oBrw:aCols[22]
    oCol:cHeader      :='Hora'
    oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
    oCol:nWidth       := 70
 
-ENDIF
+   oCol:=oBemaViewZ:oBrw:aCols[11]
+   oCol:cHeader      :='#Reg'+CRLF+"Ticket"
+   oCol:bLClickHeader:= {|r,c,f,o| SortArray( o, oBemaViewZ:oBrw:aArrayData ) } 
+   oCol:nWidth       := 70
+
+
+
+
 
    oBemaViewZ:oBrw:bClrStd               := {|oBrw,nClrText,aData|oBrw:=oBemaViewZ:oBrw,aData:=oBrw:aArrayData[oBrw:nArrayAt],;
                                            oBemaViewZ:nClrText,;
@@ -770,38 +623,8 @@ FUNCTION IMPRIMIR()
 RETURN .T.
 
 FUNCTION LEEFECHAS()
-  LOCAL nPeriodo:=oBemaViewZ:oPeriodo:nAt,cWhere
-
-  oBemaViewZ:nPeriodo:=nPeriodo
-
-
-  IF oBemaViewZ:oPeriodo:nAt=LEN(oBemaViewZ:oPeriodo:aItems)
-
-     oBemaViewZ:oDesde:ForWhen(.T.)
-     oBemaViewZ:oHasta:ForWhen(.T.)
-     oBemaViewZ:oBtn  :ForWhen(.T.)
-
-     DPFOCUS(oBemaViewZ:oDesde)
-
-  ELSE
-
-     oBemaViewZ:aFechas:=EJECUTAR("DPDIARIOGET",nPeriodo)
-
-     oBemaViewZ:oDesde:VarPut(oBemaViewZ:aFechas[1] , .T. )
-     oBemaViewZ:oHasta:VarPut(oBemaViewZ:aFechas[2] , .T. )
-
-     oBemaViewZ:dDesde:=oBemaViewZ:aFechas[1]
-     oBemaViewZ:dHasta:=oBemaViewZ:aFechas[2]
-
-     cWhere:=oBemaViewZ:HACERWHERE(oBemaViewZ:dDesde,oBemaViewZ:dHasta,oBemaViewZ:cWhere,.T.)
-
-     oBemaViewZ:LEERDATA(cWhere,oBemaViewZ:oBrw,oBemaViewZ:cServer,oBemaViewZ)
-
-  ENDIF
-
-  oBemaViewZ:SAVEPERIODO()
-
 RETURN .T.
+
 
 FUNCTION HACERWHERE(dDesde,dHasta,cWhere_,lRun)
    LOCAL cWhere:=""
@@ -839,7 +662,7 @@ FUNCTION HACERWHERE(dDesde,dHasta,cWhere_,lRun)
 RETURN cWhere
 
 
-FUNCTION LEERDATA(cWhere,oBrw,cServer,aTipIva,oMdi)
+FUNCTION LEERDATA(cWhere,oBrw,cServer,cTableA)
    LOCAL aData:={},aTotal:={},oCol,cSql,aLines:={}
    LOCAL oDb
 
@@ -855,49 +678,21 @@ FUNCTION LEERDATA(cWhere,oBrw,cServer,aTipIva,oMdi)
 
    ENDIF
 
-   IF ValType(oBrw)="O"
+   DEFAULT cTableA:="DPAUDELIMODCNF"
 
-     DEFAULT oMdi:=oBrw:oLbx
-
-     aTipIva:=oMdi:aTipIva
-
-   ENDIF
-
-// ViewArray(aTipIva)
-
-   cColVta:=""
-   cColDev:=""
-
-   cSql:=[ SELECT ]+;
-         [ DOC_SERFIS,]+;
-         [ DOC_GIRNUM AS ZETA,]+;
-         [ DOC_NUMERO,DOC_FECHA,DOC_PLAEXP,DOC_NUMFIS]
-
-         FOR I=1 TO LEN(aTipIva)
-           cSql:=cSql+[,]+CRLF+[ ZFF_MTO]+aTipIva[I,1]
-         NEXT I
-
-//         [ DOC_BASNET,DOC_MTOEXE,DOC_MTOIVA,DOC_NETO,DOC_OTROS AS IGTF,DOC_TIPO,DOC_NUMMEM,DOC_CODSUC, ]+;
-//         [ ZDF_DESDE,ZDF_HASTA,ZDF_MTOEXE,ZDF_BASE,ZDF_IVA,ZDF_NETO,ZDF_MTOIGT,DOC_HORA ]+;
-
-         cSql:=cSql+",DOC_NUMMEM"+CRLF+;
-         [ FROM dpdoccli ]+;
-         [ LEFT JOIN view_zffmensual ON DOC_CODSUC=ZFF_CODSUC AND DOC_GIRNUM=ZFF_ZETA ]+;
-         [ LEFT JOIN view_zdfmensual ON DOC_CODSUC=ZDF_CODSUC AND DOC_GIRNUM=ZDF_ZETA ]+;
-         [ WHERE DOC_TIPDOC="ZFF" ]+IF(Empty(cWhere),""," AND "+cWhere)
+    cSql:=[ SELECT ]+;
+          [ DOC_NUMERO,DOC_GIRNUM AS ZETA,DOC_SERFIS,DOC_NUMFIS,]+;
+          [ DOC_BASNET,DOC_MTOEXE,DOC_MTOIVA,DOC_NETO,DOC_OTROS AS IGTF,DOC_FECHA,DOC_HORA,DOC_NUMMEM ]+;
+          [ FROM dpdoccli ]+;
+          [ WHERE DOC_TIPDOC="ZIF" ]+IF(Empty(cWhere),""," AND "+cWhere)
 
    cSql:=EJECUTAR("WHERE_VAR",cSql)
-
-// ? CLPCOPY(cSql)
-// RETURN NIL
 
    oDp:lExcluye:=.T.
 
    aData:=ASQL(cSql,oDb)
 
    oDp:cWhere:=cWhere
-
-   DPWRITE("TEMP\DLL_BEMATECH_VIEWZ.SQL",oDp:cSql)
 
 
    IF EMPTY(aData)
@@ -950,22 +745,13 @@ RETURN .T.
 // Ejecución Cambio de Linea 
 */
 FUNCTION BRWCHANGE()
-  LOCAL nNumMem:=oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,LEN(oBemaViewZ:oBrw:aCols)]
-  LOCAL aLine  :=oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt]
-//  LOCAL oCol   :=oBemaViewZ:oBrw:aCols[11]
-
+  LOCAL nNumMem:=oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,12]
 
   oBemaViewZ:cMemo:=SQLGET("DPMEMO","MEM_MEMO","MEM_NUMERO"+GetWhere("=",nNumMem))
+ // oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,12]
   oBemaViewZ:oMemo:VarPut(oBemaViewZ:cMemo,.T.)
 
-//  oCol:nEditType:=0
-/*
-  IF aLine[12]<>"AUT" .AND. !Empty(aLine[12])
-    oCol:nEditType:=1
-    oCol:bOnPostEdit:={|oCol,uValue|oBemaViewZ:PUTMONTO(oCol,uValue,11,"DOC_OTROS","ZFF")}
-  ENDIF
-*/
-
+ 
 RETURN NIL
 
 /*
@@ -1005,40 +791,7 @@ FUNCTION BRWRESTOREPAR()
 RETURN EJECUTAR("BRWRESTOREPAR",oBemaViewZ)
 
 FUNCTION VERDETALLES()
-   LOCAL aLine  :=oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt]
-   LOCAL cSerie :=aLine[03]
-   LOCAL cCodSuc:=aLine[15-1]
-   LOCAL cZeta  :=aLine[02]
-   LOCAL cWhere :="DOC_GIRNUM"+GetWhere("=",cZeta)
-   LOCAL cDesde :=aLine[04]
-   LOCAL cHasta :=aLine[05]  
-   LOCAL dDesde :=NIL
-   LOCAL dHasta :=NIL
-   LOCAL lZeta  :=.F.,cTitle:=" Zeta "+cZeta
- 
-   cWhere:=GetWhereAnd("DOC_NUMERO",cDesde,cHasta)
-
-   EJECUTAR("BRTICKETPOS",cWhere,cCodSuc,oDp:nIndefinida,dDesde,dHasta,cTitle,lZeta,cSerie)
-
+   ? "VERDETALLES"
 RETURN .T.
 
-
-FUNCTION PUTMONTO(oCol,uValue,nCol,cField,cTipDoc)
-  LOCAL aLine  :=oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt]
-  LOCAL cSerie :=aLine[01]
-  LOCAL cCodSuc:=aLine[15-1]
-  LOCAL cNumero:=aLine[03]
-  LOCAL cWhere 
-
-  cWhere :="DOC_CODSUC"+GetWhere("=",cCodSuc)+" AND "+;
-           "DOC_TIPDOC"+GetWhere("=",cTipDoc)+" AND "+;
-           "DOC_NUMERO"+GetWhere("=",cNumero)+" AND "+;
-           "DOC_TIPTRA"+GetWhere("=","D"    )
-
-  SQLUPDATE("DPDOCCLI",cField,uValue,cWhere)
-
-  oBemaViewZ:oBrw:aArrayData[oBemaViewZ:oBrw:nArrayAt,nCol]:=uValue
-  oBemaViewZ:oBrw:DrawLine(.T.)
-
-RETURN .T.
 // EOF
