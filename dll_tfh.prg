@@ -5,7 +5,7 @@
 // Llamado por: DPDOCCLI_PRINT      
 // Aplicación : Facturación/Punto de Venta
 // Tabla      : DPDOCCLI/DPMOVINV
-
+// Manual     : https://github.com/AdaptaProERP/impresoras-fiscales/blob/main/%5BVE%5DManual%20de%20Protocolos%20y%20Comandos%20Venezuela%20V0805R00-1.pdf
 #INCLUDE "DPXBASE.CH"
 
 PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption,cCmd)
@@ -20,6 +20,9 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption,cCmd)
           cCmd      :=""
 
   EJECUTAR("DLL_TFHKA_DOWNLOAD") // Valida y descarga tfhkaif.dll
+
+
+//  oDp:lImpFisModVal:=.F.
 
   WHILE EMPTY(TFH_INI(oDp:cImpFisCom)) .OR. oTFH:lError
 
@@ -45,7 +48,7 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption,cCmd)
   /*
   // utilizado para REPORTZ o REPORTEX
   */
-  IF Empty(cCodSuc) .AND. ("Z"$cCmd .OR. "X"$cCmd .OR. "7"$cCmd)
+  IF Empty(cCodSuc) .AND. ("Z"$cCmd .OR. "X"$cCmd .OR. "7"$cCmd .OR. "GETFAV"$cCmd)
 
      IF "X"$cCmd
        lError:=REPORTEX()
@@ -60,6 +63,16 @@ PROCE MAIN(cCodSuc,cTipDoc,cNumero,cOption,cCmd)
      IF "7"$cCmd
         lError:=TFHRESERT()
         cTipo :="RESE"
+     ENDIF
+
+     IF "GETFAV"$cCmd
+        ? "LEER ULTIMO NUMERO DE FACTURA DESDE THEFACTORY"
+
+
+        cTipo:=DpGetData()
+
+? cTipo,"cTipo",oTFH:cData
+
      ENDIF
 
   ELSE
@@ -357,10 +370,16 @@ RETURN .T.
 // Apertura del Puerto para iniciar comunicación
 */
 FUNCTION DpOpenFpctrl(lpPortName ) 
-  LOCAL cFarProc:= GetProcAddress(oDp:nTFHDLL,If(Empty("OpenFpctrl" ) == .t.,"DpOpenFpctrl","OpenFpctrl" ),.T.,7,9 ) 
+  LOCAL cFarProc:= GetProcAddress(oDp:nTFHDLL,"OpenFpctrl",.T.,7,9 ) 
   LOCAL uResult := CallDLL(cFarProc,lpPortName ) 
 
-  oTFH:oFile:AppStr("DpOpenFpctrl: Pararam->"+CTOO(lpPortName,"C")+",Resp->"+CTOO(uResult,"C")+CRLF)
+  IF oDp:lImpFisModVal
+    oTFH:oFile:AppStr("Modo Validación ACTIVADO "+CRLF)
+  ENDIF
+
+  IF ValType(oTFH:oFile)="O"
+    oTFH:oFile:AppStr("DpOpenFpctrl: Pararam->"+CTOO(lpPortName,"C")+",Resp->"+CTOO(uResult,"C")+CRLF)
+  ENDIF
 
 RETURN uResult
 
@@ -376,10 +395,58 @@ FUNCTION DpCheckFprinter()
 RETURN uResult
 
 /*
+// leer valores de la impresora, comandos S1,S2
+*/
+FUNCTION DpGetData(cFunction,cCmd) 
+  LOCAL cFarProc:=NIL
+  LOCAL uResult :=NIL
+  LOCAL lStatus :=1
+  LOCAL lError  :=1
+  LOCAL cData   :=SPACE(254)
+
+  DEFAULT cFunction:="UploadStatusDin",;
+          cCmd     :="S1"
+
+  IF !oDp:lImpFisModVal
+    cFarProc:= GetProcAddress(oDp:nTFHDLL,cFunction,.T.,7,9,9,9,9) 
+    uResult := CallDLL(cFarProc,lStatus,lError,cCmd,@cData) 
+  ENDIF
+
+  IF ValType(oTFH:oFile)="O"
+    oTFH:oFile:AppStr(cFunction+",Resp->"+CTOO(uResult,"C")+"cData"+CTOO(cData,"C")+CRLF)
+  ENDIF
+
+RETURN cData
+
+/*
+// leer valores de la impresora, comandos S1,S2
+*/
+FUNCTION DpGenFileTxt(cFunction,cCmd,cFileTxt) 
+  LOCAL cFarProc:=NIL
+  LOCAL uResult :=NIL
+  LOCAL nStatus :=NIL
+  LOCAL nError  :=NIL
+
+  DEFAULT cFunction:="UploadStatusCmd",;
+          cCmd     :="S1"
+
+  cFarProc:= GetProcAddress(oDp:nTFHDLL,cFunction,.T.,7,10,9,9 ) 
+  uResult := CallDLL(cFarProc,@nStatus,@nError,@cCmd) 
+
+? uResult,"uResult",cCmd,"cCmd"
+
+  oTFH:oFile:AppStr(cFunction+",Resp->"+CTOO(uResult,"C")+CRLF)
+
+RETURN uResult
+
+
+
+
+/*
 // Cerrar la comunicación
 */
 FUNCTION DpCloseFpctrl() 
-  LOCAL cFarProc:= GetProcAddress(oDp:nTFHDLL,If(Empty("CloseFpctrl" ) == .t.,"DpCloseFpctrl","CloseFpctrl" ),.T.,7 ) 
+  LOCAL cFarProc:= GetProcAddress(oDp:nTFHDLL,"CloseFpctrl",.T.,7 ) 
   LOCAL uResult := CallDLL(cFarProc ) 
 
   oTFH:oFile:AppStr("DpCloseFpctrl() ,Resp->"+CTOO(uResult,"C")+CRLF)
@@ -391,7 +458,7 @@ RETURN uResult
 */
 FUNCTION DpReadFpStatus() 
   LOCAL nStatus :=0,nError:=0
-  LOCAL cFarProc:= GetProcAddress(oDp:nTFHDLL,If(Empty("ReadFpStatus" ) == .t.,"DpReadFpStatus","ReadFpStatus" ),.T.,7,10 ,10 ) 
+  LOCAL cFarProc:= GetProcAddress(oDp:nTFHDLL,"ReadFpStatus",.T.,7,10 ,10 ) 
   LOCAL uResult := CallDLL(cFarProc,@nStatus ,@nError )
 
   oTFH:oFile:AppStr("DpReadFpStatus:"+CTOO(nStatus,"C")+", Resp->"+CTOO(uResult,"C")+CRLF)
@@ -410,8 +477,9 @@ FUNCTION DpSendCmd(nStatus,nError,cCmd)
   LOCAL uResult 
 
   // 21/11/2023, modo validacion requiere la traza
+
   IF !oDp:lImpFisModVal
-     cFarProc := GetProcAddress(oDp:nTFHDLL,If(Empty("SendCmd" ) == .t.,"DpSendCmd","SendCmd" ),.T.,7,10 ,10,9 ) 
+     cFarProc := GetProcAddress(oDp:nTFHDLL,"SendCmd",.T.,7,10,10,9 ) 
      uResult  := CallDLL(cFarProc,@nStatus,@nError,@cCmd ) 
   ENDIF
 
@@ -426,9 +494,9 @@ RETURN uResult
 /*
 // Envio de comandos introducidos en un Archivo TEXTO
 */
-FUNCTION DpSendFileCmd(nStatus,nError,file )
-   LOCAL cFarProc:= GetProcAddress(oDp:nTFHDLL,If(Empty("SendFileCmd" ) == .t.,"DpSendFileCmd","SendFileCmd" ),.T.,7,10 ,10,9 ) 
-   LOCAL uResult := CallDLL(cFarProc,@nStatus,@nError,@file ) 
+FUNCTION DpSendFileCmd(nStatus,nError,cFile )
+   LOCAL cFarProc:= GetProcAddress(oDp:nTFHDLL,"SendFileCmd",.T.,7,10,10,9 ) 
+   LOCAL uResult := CallDLL(cFarProc,@nStatus,@nError,@cfile ) 
 
    oTFH:nStatus:=nStatus
    oTFH:nError :=nError
@@ -456,7 +524,7 @@ RETURN Empty(cError)
 // Generar Reporte Z
 */
 FUNCTION REPORTEZ()
-    LOCAL cIni:="I0Z", nStatus, nError, cError:=""
+    LOCAL cIni:="I0Z", nStatus:=NIL, nError:=NIL, cError:=""
 
     DpSendCmd(@nStatus,@nError,cIni)
 
